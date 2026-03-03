@@ -12,3 +12,6 @@ flask
 
 # Environment
 python-dotenv
+
+# Production server
+gunicorn

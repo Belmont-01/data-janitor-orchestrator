@@ -361,7 +361,13 @@
       text-transform: uppercase;
     }
 
-    .copy-btn {
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .copy-btn, .download-btn {
       font-family: var(--mono);
       font-size: 11px;
       color: var(--muted);
@@ -372,11 +378,25 @@
       cursor: pointer;
       transition: all 0.2s;
       letter-spacing: 0.06em;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
 
-    .copy-btn:hover {
+    .copy-btn:hover, .download-btn:hover {
       color: var(--accent);
       border-color: var(--accent);
+    }
+
+    .download-btn {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .download-btn:hover {
+      box-shadow: 0 0 12px var(--accent-glow);
     }
 
     .result-card-body {
@@ -444,6 +464,9 @@
 <body>
 <div class="container">
 
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+    <a href="/logout" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 12px;border-radius:2px;letter-spacing:0.08em;">Sign Out</a>
+  </div>
   <header>
     <div class="badge">Multi-Agent System</div>
     <h1>Data <span>Janitor</span><br>& Orchestrator</h1>
@@ -471,8 +494,9 @@
       <span class="file-type">.PDF</span>
       <span class="file-type">.XLSX</span>
       <span class="file-type">.TXT</span>
+      <span class="file-type">.JSON</span>
     </div>
-    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt"/>
+    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt,.json"/>
     <div class="file-selected" id="fileSelected">
       <span>📄</span>
       <span class="file-selected-name" id="fileName"></span>
@@ -499,7 +523,10 @@
     <div class="result-card">
       <div class="result-card-header">
         <span class="result-card-title">🧹 Clean JSON Output</span>
-        <button class="copy-btn" onclick="copyContent('jsonOutput')">Copy</button>
+        <div class="card-actions">
+          <button class="copy-btn" onclick="copyContent('jsonOutput')">Copy</button>
+          <button class="download-btn" id="downloadJson">⬇ Download JSON</button>
+        </div>
       </div>
       <div class="result-card-body" id="jsonOutput"></div>
     </div>
@@ -507,7 +534,10 @@
     <div class="result-card">
       <div class="result-card-header">
         <span class="result-card-title">✍️ Business Report</span>
-        <button class="copy-btn" onclick="copyContent('reportOutput')">Copy</button>
+        <div class="card-actions">
+          <button class="copy-btn" onclick="copyContent('reportOutput')">Copy</button>
+          <button class="download-btn" id="downloadReport">⬇ Download Report</button>
+        </div>
       </div>
       <div class="result-card-body report-body" id="reportOutput"></div>
     </div>
@@ -604,6 +634,10 @@
         addLog('✓ Writer complete', 'success');
         addLog('Pipeline finished successfully!', 'success');
 
+        // Store raw data for downloads
+        rawJsonData = data.clean_json;
+        rawReportData = data.report || '';
+
         // Render JSON
         jsonOutput.textContent = JSON.stringify(data.clean_json, null, 2);
 
@@ -649,6 +683,32 @@
       setTimeout(() => btn.textContent = 'Copy', 1500);
     });
   }
+
+  // --- Download handlers ---
+  let rawJsonData = null;
+  let rawReportData = null;
+
+  function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  document.getElementById('downloadJson').addEventListener('click', () => {
+    if (rawJsonData) {
+      downloadFile(JSON.stringify(rawJsonData, null, 2), 'clean_output.json', 'application/json');
+    }
+  });
+
+  document.getElementById('downloadReport').addEventListener('click', () => {
+    if (rawReportData) {
+      downloadFile(rawReportData, 'business_report.md', 'text/markdown');
+    }
+  });
 
   // Basic markdown renderer
   function markdownToHtml(md) {
