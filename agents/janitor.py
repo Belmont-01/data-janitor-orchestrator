@@ -10,7 +10,10 @@ from agents.llm_config import llm
 from errors import FileIngestionError, APIError, InvalidOutputError, AgentTimeoutError
 
 # Point pytesseract to Tesseract installation on Windows
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+import sys
+if sys.platform == "win32":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# On Linux (Render), tesseract is on PATH automatically after apt-get install
 
 
 # -------------------------------------------------------------------
@@ -70,10 +73,11 @@ def extract_from_pdf_ocr(filepath: str) -> str:
     """
     print("🔍 Scanned PDF detected — running OCR (this may take a moment)...")
     try:
+        poppler = r"C:\poppler\Library\bin" if sys.platform == "win32" else None
         pages = convert_from_path(
             filepath,
             dpi=300,  # Higher DPI = better OCR accuracy
-            poppler_path=r"C:\poppler\Library\bin"
+            poppler_path=poppler
         )
     except Exception as e:
         raise FileIngestionError(

@@ -2,7 +2,7 @@ services:
   - type: web
     name: data-janitor-orchestrator
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: bash build.sh
     startCommand: gunicorn app:app -c gunicorn.conf.py
     plan: starter
     envVars:
