@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Janitor & Orchestrator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --accent: #00ff9d;
+      --accent-dim: rgba(0,255,157,0.12);
+      --accent-glow: rgba(0,255,157,0.35);
+      --text: #e8e8f0;
+      --muted: #5a5a7a;
+      --error: #ff4d6d;
+      --warning: #ffd166;
+      --mono: 'Space Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 56px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 4px 10px;
+      border-radius: 2px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-family: var(--mono);
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 300;
+      line-height: 1.6;
+      max-width: 520px;
+    }
+
+    /* Pipeline indicator */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 28px;
+      flex-wrap: wrap;
+    }
+
+    .pipeline-step {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      letter-spacing: 0.08em;
+    }
+
+    .pipeline-arrow {
+      color: var(--accent);
+      font-size: 14px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 60px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    .drop-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-dim) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .drop-zone:hover::before,
+    .drop-zone.drag-over::before { opacity: 1; }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    .drop-icon {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      transition: all 0.25s ease;
+      background: var(--bg);
+    }
+
+    .drop-zone:hover .drop-icon,
+    .drop-zone.drag-over .drop-icon {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .drop-zone h2 {
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .drop-zone p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    .file-types {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .file-type {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      padding: 3px 8px;
+      border-radius: 2px;
+      letter-spacing: 0.08em;
+      background: var(--accent-dim);
+    }
+
+    #fileInput { display: none; }
+
+    /* Selected file indicator */
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      animation: fadeUp 0.3s ease both;
+    }
+
+    .file-selected.visible { display: flex; }
+
+    .file-selected-name {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      flex: 1;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .remove-file {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      transition: color 0.2s;
+    }
+    .remove-file:hover { color: var(--error); }
+
+    /* Run button */
+    .run-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px;
+      margin-top: 16px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .run-btn:hover:not(:disabled) {
+      box-shadow: 0 0 24px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+
+    .run-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Progress log */
+    .log-section {
+      display: none;
+      margin-top: 32px;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .log-section.visible { display: block; }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .log-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--muted);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .log-line { margin-bottom: 2px; }
+    .log-line.success { color: var(--accent); }
+    .log-line.error { color: var(--error); }
+    .log-line.info { color: var(--warning); }
+
+    /* Spinner */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--bg);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    /* Results */
+    .results {
+      display: none;
+      margin-top: 32px;
+      gap: 24px;
+      flex-direction: column;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .results.visible { display: flex; }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .result-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-card-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .copy-btn {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.06em;
+    }
+
+    .copy-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .result-card-body {
+      padding: 20px;
+      max-height: 360px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Report markdown rendering */
+    .report-body { font-family: var(--sans); font-size: 14px; }
+    .report-body h1, .report-body h2, .report-body h3 {
+      font-family: var(--mono);
+      color: var(--accent);
+      margin: 16px 0 8px;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+    }
+    .report-body p { margin-bottom: 10px; color: var(--text); line-height: 1.7; }
+    .report-body strong { color: var(--accent); font-weight: 600; }
+    .report-body ul, .report-body ol { padding-left: 20px; margin-bottom: 10px; }
+    .report-body li { margin-bottom: 4px; line-height: 1.6; }
+
+    /* Error box */
+    .error-box {
+      display: none;
+      margin-top: 24px;
+      padding: 16px 20px;
+      background: rgba(255,77,109,0.08);
+      border: 1px solid var(--error);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--error);
+      line-height: 1.7;
+      animation: fadeUp 0.3s ease both;
+    }
+
+    .error-box.visible { display: block; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="badge">Multi-Agent System</div>
+    <h1>Data <span>Janitor</span><br>& Orchestrator</h1>
+    <p class="subtitle">Upload any messy file — the agent pipeline will clean it, analyze it, and write you a business report.</p>
+    <div class="pipeline">
+      <div class="pipeline-step">📄 Your File</div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">🧹 Janitor</div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">🔍 Researcher</div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">✍️ Writer</div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">📊 Report</div>
+    </div>
+  </header>
+
+  <!-- Drop Zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">📁</div>
+    <h2>Drop your file here</h2>
+    <p>or click to browse</p>
+    <div class="file-types">
+      <span class="file-type">.CSV</span>
+      <span class="file-type">.PDF</span>
+      <span class="file-type">.XLSX</span>
+      <span class="file-type">.TXT</span>
+    </div>
+    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt"/>
+    <div class="file-selected" id="fileSelected">
+      <span>📄</span>
+      <span class="file-selected-name" id="fileName"></span>
+      <button class="remove-file" id="removeFile" title="Remove file">✕</button>
+    </div>
+  </div>
+
+  <button class="run-btn" id="runBtn" disabled>
+    Run Pipeline
+  </button>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Log -->
+  <div class="log-section" id="logSection">
+    <div class="section-label">Agent Log</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <div class="result-card">
+      <div class="result-card-header">
+        <span class="result-card-title">🧹 Clean JSON Output</span>
+        <button class="copy-btn" onclick="copyContent('jsonOutput')">Copy</button>
+      </div>
+      <div class="result-card-body" id="jsonOutput"></div>
+    </div>
+
+    <div class="result-card">
+      <div class="result-card-header">
+        <span class="result-card-title">✍️ Business Report</span>
+        <button class="copy-btn" onclick="copyContent('reportOutput')">Copy</button>
+      </div>
+      <div class="result-card-body report-body" id="reportOutput"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const dropZone   = document.getElementById('dropZone');
+  const fileInput  = document.getElementById('fileInput');
+  const fileSelected = document.getElementById('fileSelected');
+  const fileName   = document.getElementById('fileName');
+  const removeFile = document.getElementById('removeFile');
+  const runBtn     = document.getElementById('runBtn');
+  const errorBox   = document.getElementById('errorBox');
+  const logSection = document.getElementById('logSection');
+  const logBox     = document.getElementById('logBox');
+  const results    = document.getElementById('results');
+  const jsonOutput = document.getElementById('jsonOutput');
+  const reportOutput = document.getElementById('reportOutput');
+
+  let selectedFile = null;
+
+  // --- Drag and drop ---
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  dropZone.addEventListener('click', e => {
+    if (e.target === removeFile) return;
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  removeFile.addEventListener('click', e => {
+    e.stopPropagation();
+    clearFile();
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSelected.classList.add('visible');
+    runBtn.disabled = false;
+    hideError();
+    results.classList.remove('visible');
+    logSection.classList.remove('visible');
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    fileInput.value = '';
+    fileSelected.classList.remove('visible');
+    runBtn.disabled = true;
+  }
+
+  // --- Run pipeline ---
+  runBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    // Reset UI
+    hideError();
+    results.classList.remove('visible');
+    logSection.classList.add('visible');
+    logBox.innerHTML = '';
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<span class="spinner"></span> Running Pipeline...';
+
+    addLog('Pipeline starting...', 'info');
+    addLog(`File: ${selectedFile.name}`, 'info');
+    addLog('Janitor agent — cleaning data...', '');
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const response = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      if (data.success) {
+        addLog('✓ Janitor complete', 'success');
+        addLog('Researcher agent — analyzing patterns...', '');
+        addLog('✓ Researcher complete', 'success');
+        addLog('Writer agent — generating report...', '');
+        addLog('✓ Writer complete', 'success');
+        addLog('Pipeline finished successfully!', 'success');
+
+        // Render JSON
+        jsonOutput.textContent = JSON.stringify(data.clean_json, null, 2);
+
+        // Render report (basic markdown → HTML)
+        reportOutput.innerHTML = markdownToHtml(data.report || 'No report generated.');
+
+        results.classList.add('visible');
+      } else {
+        addLog(`Error: ${data.error}`, 'error');
+        showError(data.error);
+      }
+    } catch (err) {
+      addLog(`Network error: ${err.message}`, 'error');
+      showError(`Could not connect to the server. Make sure app.py is running.\n${err.message}`);
+    } finally {
+      runBtn.disabled = false;
+      runBtn.innerHTML = 'Run Pipeline';
+    }
+  });
+
+  function addLog(text, type = '') {
+    const line = document.createElement('div');
+    line.className = `log-line ${type}`;
+    line.textContent = `> ${text}`;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = `❌ ${msg}`;
+    errorBox.classList.add('visible');
+  }
+
+  function hideError() {
+    errorBox.classList.remove('visible');
+  }
+
+  function copyContent(id) {
+    const el = document.getElementById(id);
+    navigator.clipboard.writeText(el.textContent).then(() => {
+      const btn = el.closest('.result-card').querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  }
+
+  // Basic markdown renderer
+  function markdownToHtml(md) {
+    return md
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>\n?)+/g, s => `<ul>${s}</ul>`)
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/^(?!<[hul])(.+)$/gm, '<p>$1</p>')
+      .replace(/<p><\/p>/g, '');
+  }
+</script>
+</body>
+</html>

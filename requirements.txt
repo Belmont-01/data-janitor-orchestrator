@@ -1,0 +1,14 @@
+# Core AI & Agent framework
+crewai
+google-generativeai
+
+# Data extraction
+pdfplumber       # PDF text extraction
+pandas           # CSV handling
+openpyxl         # Excel support (future use)
+
+# Web UI
+flask
+
+# Environment
+python-dotenv
