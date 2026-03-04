@@ -13,7 +13,9 @@ if not api_key:
 
 # Single shared LLM instance for all agents
 llm = LLM(
-    model="gemini/gemini-2.0-flash",
+    model="gemini/gemini-2.5-flash",
     api_key=api_key,
-    max_rpm=10
+    max_rpm=1,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    timeout=120
 )
