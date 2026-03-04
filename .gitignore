@@ -62,3 +62,6 @@ desktop.ini
 *.temp
 tmp/
 temp/
+-e 
+# Database
+data/app.db

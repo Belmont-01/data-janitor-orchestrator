@@ -11,28 +11,26 @@ from errors import (
     PipelineError, FileIngestionError, APIError,
     InvalidOutputError, AgentTimeoutError
 )
+from database import init_db, create_user, authenticate_user, save_run, get_user_runs, get_run
 
 load_dotenv(find_dotenv())
 
-# Fix working directory so all relative paths work correctly
+# Fix working directory
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Ensure output directories exist on startup
+# Ensure output directories exist
 os.makedirs("data/clean", exist_ok=True)
 os.makedirs("data/raw", exist_ok=True)
+
+# Initialize database
+init_db()
 
 from orchestrator.boss import run_pipeline
 
 app = Flask(__name__)
-
-# -------------------------------------------------------------------
-# Security config — all values from environment variables
-# -------------------------------------------------------------------
 app.secret_key = os.getenv("SECRET_KEY", "change-this-in-production")
-APP_USERNAME = os.getenv("APP_USERNAME", "admin")
-APP_PASSWORD = os.getenv("APP_PASSWORD", "changeme")
 
-ALLOWED_EXTENSIONS = {".csv", ".pdf", ".xlsx", ".xls", ".txt", ".json"}
+ALLOWED_EXTENSIONS = {".csv", ".pdf", ".xlsx", ".xls", ".txt", ".json", ".docx"}
 
 
 # -------------------------------------------------------------------
@@ -49,27 +47,51 @@ def login_required(f):
 
 
 def allowed_file(filename: str) -> bool:
-    ext = os.path.splitext(filename)[-1].lower()
-    return ext in ALLOWED_EXTENSIONS
+    return os.path.splitext(filename)[-1].lower() in ALLOWED_EXTENSIONS
 
 
 # -------------------------------------------------------------------
-# Routes
+# Auth routes
 # -------------------------------------------------------------------
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
     error = None
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        if username == APP_USERNAME and password == APP_PASSWORD:
+        confirm  = request.form.get("confirm", "").strip()
+        if password != confirm:
+            error = "Passwords do not match."
+        else:
+            result = create_user(username, password)
+            if result["success"]:
+                return redirect(url_for("login", registered="1"))
+            else:
+                error = result["error"]
+    return render_template("register.html", error=error)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
+    error = None
+    registered = request.args.get("registered")
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        user = authenticate_user(username, password)
+        if user:
             session["logged_in"] = True
-            session["username"] = username
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
             return redirect(url_for("index"))
         else:
             error = "Invalid username or password."
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=error, registered=registered)
 
 
 @app.route("/logout")
@@ -78,77 +100,132 @@ def logout():
     return redirect(url_for("login"))
 
 
+# -------------------------------------------------------------------
+# Main routes
+# -------------------------------------------------------------------
+
 @app.route("/")
 @login_required
 def index():
     return render_template("index.html", username=session.get("username"))
 
 
+@app.route("/history")
+@login_required
+def history():
+    runs = get_user_runs(session["user_id"])
+    return render_template("history.html", runs=runs, username=session.get("username"))
+
+
+@app.route("/history/<int:run_id>")
+@login_required
+def run_detail(run_id):
+    run = get_run(run_id, session["user_id"])
+    if not run:
+        return redirect(url_for("history"))
+    return render_template("run_detail.html", run=run, username=session.get("username"))
+
+
+# -------------------------------------------------------------------
+# Upload route — supports multiple files
+# -------------------------------------------------------------------
+
 @app.route("/upload", methods=["POST"])
 @login_required
 def upload():
-    if "file" not in request.files:
-        return jsonify({"success": False, "error": "No file provided."}), 400
+    files = request.files.getlist("file")
 
-    file = request.files["file"]
+    if not files or all(f.filename == "" for f in files):
+        return jsonify({"success": False, "error": "No files provided."}), 400
 
-    if not file.filename:
-        return jsonify({"success": False, "error": "No file selected."}), 400
+    results = []
 
-    if not allowed_file(file.filename):
-        ext = os.path.splitext(file.filename)[-1].lower()
-        return jsonify({
-            "success": False,
-            "error": f"Unsupported file type: '{ext}'. Supported: .csv, .pdf, .xlsx, .txt, .json"
-        }), 400
+    for file in files:
+        if not file.filename:
+            continue
 
-    suffix = os.path.splitext(file.filename)[-1].lower()
-    tmp_path = None
+        if not allowed_file(file.filename):
+            ext = os.path.splitext(file.filename)[-1].lower()
+            results.append({
+                "filename": file.filename,
+                "success": False,
+                "error": f"Unsupported file type: '{ext}'"
+            })
+            continue
 
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            file.save(tmp.name)
-            tmp_path = tmp.name
+        suffix = os.path.splitext(file.filename)[-1].lower()
+        tmp_path = None
 
-        output_dir = "data/clean"
-        run_pipeline(tmp_path, output_dir)
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                file.save(tmp.name)
+                tmp_path = tmp.name
 
-        json_path = os.path.join(output_dir, "output.json")
-        report_path = os.path.join(output_dir, "report.md")
+            output_dir = f"data/clean"
+            run_pipeline(tmp_path, output_dir)
 
-        clean_json = None
-        report_text = None
+            clean_json = None
+            report_text = None
 
-        if os.path.exists(json_path):
-            with open(json_path, "r") as f:
-                clean_json = json.load(f)
+            json_path = os.path.join(output_dir, "output.json")
+            report_path = os.path.join(output_dir, "report.md")
 
-        if os.path.exists(report_path):
-            with open(report_path, "r") as f:
-                report_text = f.read()
+            if os.path.exists(json_path):
+                with open(json_path, "r") as f:
+                    clean_json = json.load(f)
 
-        return jsonify({
-            "success": True,
-            "filename": file.filename,
-            "clean_json": clean_json,
-            "report": report_text
-        })
+            if os.path.exists(report_path):
+                with open(report_path, "r") as f:
+                    report_text = f.read()
 
-    except FileIngestionError as e:
-        return jsonify({"success": False, "error": f"File Error: {e}"}), 422
-    except APIError as e:
-        return jsonify({"success": False, "error": f"API Error: {e}"}), 502
-    except InvalidOutputError as e:
-        return jsonify({"success": False, "error": f"Output Error: {e}"}), 500
-    except AgentTimeoutError as e:
-        return jsonify({"success": False, "error": f"Timeout: {e}"}), 504
-    except PipelineError as e:
-        return jsonify({"success": False, "error": f"Pipeline Error: {e}"}), 500
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Unexpected error: {e}"}), 500
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
+            # Save to history
+            save_run(
+                user_id=session["user_id"],
+                filename=file.filename,
+                status="success",
+                clean_json=clean_json,
+                report=report_text
+            )
+
+            results.append({
+                "filename": file.filename,
+                "success": True,
+                "clean_json": clean_json,
+                "report": report_text
+            })
+
+        except (FileIngestionError, APIError, InvalidOutputError,
+                AgentTimeoutError, PipelineError) as e:
+            save_run(
+                user_id=session["user_id"],
+                filename=file.filename,
+                status="error",
+                error=str(e)
+            )
+            results.append({
+                "filename": file.filename,
+                "success": False,
+                "error": str(e)
+            })
+
+        except Exception as e:
+            save_run(
+                user_id=session["user_id"],
+                filename=file.filename,
+                status="error",
+                error=str(e)
+            )
+            results.append({
+                "filename": file.filename,
+                "success": False,
+                "error": f"Unexpected error: {e}"
+            })
+
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    return jsonify({"success": True, "results": results})
 
 
 if __name__ == "__main__":

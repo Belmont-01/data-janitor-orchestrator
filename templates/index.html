@@ -464,9 +464,13 @@
 <body>
 <div class="container">
 
-  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-    <a href="/logout" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 12px;border-radius:2px;letter-spacing:0.08em;">Sign Out</a>
-  </div>
+  <nav style="display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;">
+    <div style="display:flex;gap:12px;">
+      <a href="/" style="font-family:var(--mono);font-size:12px;color:var(--accent);text-decoration:none;border:1px solid var(--accent);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;">Pipeline</a>
+      <a href="/history" style="font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;transition:all 0.2s;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">History</a>
+    </div>
+    <a href="/logout" style="font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;">Sign Out</a>
+  </nav>
   <header>
     <div class="badge">Multi-Agent System</div>
     <h1>Data <span>Janitor</span><br>& Orchestrator</h1>
@@ -495,8 +499,9 @@
       <span class="file-type">.XLSX</span>
       <span class="file-type">.TXT</span>
       <span class="file-type">.JSON</span>
+      <span class="file-type">.DOCX</span>
     </div>
-    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt,.json"/>
+    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt,.json,.docx" multiple/>
     <div class="file-selected" id="fileSelected">
       <span>📄</span>
       <span class="file-selected-name" id="fileName"></span>
@@ -588,7 +593,8 @@
 
   function setFile(file) {
     selectedFile = file;
-    fileName.textContent = file.name;
+    const files = fileInput.files;
+    fileName.textContent = files.length > 1 ? `${files.length} files selected` : file.name;
     fileSelected.classList.add('visible');
     runBtn.disabled = false;
     hideError();
@@ -620,33 +626,33 @@
     addLog('Janitor agent — cleaning data...', '');
 
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    const files = fileInput.files.length > 0 ? fileInput.files : [selectedFile];
+    for (const f of files) { formData.append('file', f); }
 
     try {
       const response = await fetch('/upload', { method: 'POST', body: formData });
       const data = await response.json();
 
-      if (data.success) {
-        addLog('✓ Janitor complete', 'success');
-        addLog('Researcher agent — analyzing patterns...', '');
-        addLog('✓ Researcher complete', 'success');
-        addLog('Writer agent — generating report...', '');
-        addLog('✓ Writer complete', 'success');
-        addLog('Pipeline finished successfully!', 'success');
-
-        // Store raw data for downloads
-        rawJsonData = data.clean_json;
-        rawReportData = data.report || '';
-
-        // Render JSON
-        jsonOutput.textContent = JSON.stringify(data.clean_json, null, 2);
-
-        // Render report (basic markdown → HTML)
-        reportOutput.innerHTML = markdownToHtml(data.report || 'No report generated.');
-
-        results.classList.add('visible');
+      if (data.success && data.results) {
+        const succeeded = data.results.filter(r => r.success);
+        const failed = data.results.filter(r => !r.success);
+        failed.forEach(r => addLog('Failed: ' + r.filename + ' — ' + r.error, 'error'));
+        succeeded.forEach(r => addLog('Complete: ' + r.filename, 'success'));
+        addLog('Pipeline finished: ' + succeeded.length + ' succeeded, ' + failed.length + ' failed',
+               succeeded.length > 0 ? 'success' : 'error');
+        const last = succeeded[succeeded.length - 1];
+        if (last) {
+          rawJsonData = last.clean_json;
+          rawReportData = last.report || '';
+          jsonOutput.textContent = JSON.stringify(last.clean_json, null, 2);
+          reportOutput.innerHTML = markdownToHtml(last.report || 'No report generated.');
+          results.classList.add('visible');
+        }
+        if (succeeded.length > 0) {
+          addLog('View all runs in History', 'info');
+        }
       } else {
-        addLog(`Error: ${data.error}`, 'error');
+        addLog('Error: ' + data.error, 'error');
         showError(data.error);
       }
     } catch (err) {

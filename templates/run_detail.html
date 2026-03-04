@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Run Detail — Data Janitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
+      --accent: #00ff9d; --accent-dim: rgba(0,255,157,0.12);
+      --accent-glow: rgba(0,255,157,0.35); --text: #e8e8f0;
+      --muted: #5a5a7a; --error: #ff4d6d;
+      --mono: 'Space Mono', monospace; --sans: 'DM Sans', sans-serif;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; z-index: 0; }
+    .container { max-width: 900px; margin: 0 auto; padding: 60px 24px; position: relative; z-index: 1; }
+    nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 48px; }
+    .nav-left { display: flex; gap: 16px; align-items: center; }
+    .nav-link { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: 2px; transition: all 0.2s; letter-spacing: 0.06em; }
+    .nav-link:hover { color: var(--accent); border-color: var(--accent); }
+    h1 { font-family: var(--mono); font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .meta { color: var(--muted); font-size: 13px; margin-bottom: 40px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .meta-item { display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status-dot.success { background: var(--accent); }
+    .status-dot.error { background: var(--error); }
+    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+    .result-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .result-card-title { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; }
+    .card-actions { display: flex; gap: 8px; }
+    .action-btn { font-family: var(--mono); font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 2px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    .action-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .action-btn.dl { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+    .result-card-body { padding: 20px; max-height: 400px; overflow-y: auto; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .report-body { font-family: var(--sans); font-size: 14px; white-space: normal; }
+    .report-body h1, .report-body h2, .report-body h3 { font-family: var(--mono); color: var(--accent); margin: 16px 0 8px; font-size: 13px; }
+    .report-body p { margin-bottom: 10px; line-height: 1.7; }
+    .report-body strong { color: var(--accent); }
+    .report-body ul, .report-body ol { padding-left: 20px; margin-bottom: 10px; }
+    .report-body li { margin-bottom: 4px; }
+    .error-box { padding: 20px; background: rgba(255,77,109,0.08); border: 1px solid var(--error); border-radius: 8px; font-family: var(--mono); font-size: 12px; color: var(--error); line-height: 1.7; }
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: var(--bg); } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <nav>
+    <div class="nav-left">
+      <a href="/" class="nav-link">← Pipeline</a>
+      <a href="/history" class="nav-link">History</a>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">{{ username }}</span>
+      <a href="/logout" class="nav-link">Sign Out</a>
+    </div>
+  </nav>
+
+  <h1>📄 {{ run.filename }}</h1>
+  <div class="meta">
+    <div class="meta-item">
+      <div class="status-dot {{ run.status }}"></div>
+      <span>{{ run.status }}</span>
+    </div>
+    <div class="meta-item">🕐 {{ run.created[:16].replace('T', ' at ') }} UTC</div>
+  </div>
+
+  {% if run.status == 'error' %}
+    <div class="error-box">❌ {{ run.error }}</div>
+
+  {% else %}
+    {% if run.clean_json %}
+    <div class="result-card">
+      <div class="result-card-header">
+        <span class="result-card-title">🧹 Clean JSON Output</span>
+        <div class="card-actions">
+          <button class="action-btn" onclick="copyJson()">Copy</button>
+          <button class="action-btn dl" onclick="downloadJson()">⬇ Download JSON</button>
+        </div>
+      </div>
+      <div class="result-card-body" id="jsonOutput">{{ run.clean_json | tojson(indent=2) }}</div>
+    </div>
+    {% endif %}
+
+    {% if run.report %}
+    <div class="result-card">
+      <div class="result-card-header">
+        <span class="result-card-title">✍️ Business Report</span>
+        <div class="card-actions">
+          <button class="action-btn" onclick="copyReport()">Copy</button>
+          <button class="action-btn dl" onclick="downloadReport()">⬇ Download Report</button>
+        </div>
+      </div>
+      <div class="result-card-body report-body" id="reportOutput"></div>
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+
+<script>
+  const rawReport = {{ run.report | tojson if run.report else '""' }};
+
+  function markdownToHtml(md) {
+    return md
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>\n?)+/g, s => `<ul>${s}</ul>`)
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/^(?!<[hul])(.+)$/gm, '<p>$1</p>')
+      .replace(/<p><\/p>/g, '');
+  }
+
+  if (rawReport) {
+    document.getElementById('reportOutput').innerHTML = markdownToHtml(rawReport);
+  }
+
+  function downloadFile(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyJson() {
+    navigator.clipboard.writeText(document.getElementById('jsonOutput').textContent);
+  }
+
+  function copyReport() {
+    navigator.clipboard.writeText(rawReport);
+  }
+
+  function downloadJson() {
+    downloadFile(document.getElementById('jsonOutput').textContent, 'clean_output.json', 'application/json');
+  }
+
+  function downloadReport() {
+    downloadFile(rawReport, 'business_report.md', 'text/markdown');
+  }
+</script>
+</body>
+</html>

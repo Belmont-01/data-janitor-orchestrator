@@ -6,6 +6,7 @@ google-generativeai
 pdfplumber
 pandas
 openpyxl
+python-docx      # Word document support
 pytesseract
 Pillow
 pdf2image

@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import pdfplumber
+import docx
 import pytesseract
 from PIL import Image
 from pdf2image import convert_from_path
@@ -177,6 +178,23 @@ def extract_from_json(filepath: str) -> str:
         raise FileIngestionError(f"Could not parse JSON file '{filepath}': {e}")
 
 
+def extract_from_docx(filepath: str) -> str:
+    """Extract text from a Word document (.docx)."""
+    try:
+        doc = docx.Document(filepath)
+        text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+        if not text.strip():
+            raise FileIngestionError(f"Word document is empty or has no readable text: {filepath}")
+        return text
+    except FileNotFoundError:
+        raise FileIngestionError(
+            f"Word document not found: '{filepath}'"
+            f"Check that the file exists and the path is correct."
+        )
+    except Exception as e:
+        raise FileIngestionError(f"Could not read Word document '{filepath}': {e}")
+
+
 def extract_raw_text(filepath: str) -> str:
     """Route to the correct extractor based on file extension."""
     if not os.path.exists(filepath):
@@ -193,12 +211,13 @@ def extract_raw_text(filepath: str) -> str:
         ".xls":  extract_from_excel,
         ".txt":  extract_from_txt,
         ".json": extract_from_json,
+        ".docx": extract_from_docx,
     }
 
     if ext not in extractors:
         raise FileIngestionError(
             f"Unsupported file type: '{ext}'\n"
-            f"Supported types: .csv, .pdf, .xlsx, .xls, .txt, .json"
+            f"Supported types: .csv, .pdf, .xlsx, .xls, .txt, .json, .docx"
         )
 
     return extractors[ext](filepath)

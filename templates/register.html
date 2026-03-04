@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login — Data Janitor & Orchestrator</title>
+  <title>Register — Data Janitor & Orchestrator</title>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,12 +11,12 @@
       --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
       --accent: #00ff9d; --accent-dim: rgba(0,255,157,0.12);
       --accent-glow: rgba(0,255,157,0.35); --text: #e8e8f0;
-      --muted: #5a5a7a; --error: #ff4d6d; --success: #00ff9d;
+      --muted: #5a5a7a; --error: #ff4d6d;
       --mono: 'Space Mono', monospace; --sans: 'DM Sans', sans-serif;
     }
     body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 48px 40px; width: 100%; max-width: 400px; position: relative; z-index: 1; animation: fadeUp 0.5s ease both; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 48px 40px; width: 100%; max-width: 420px; position: relative; z-index: 1; animation: fadeUp 0.5s ease both; }
     .card::before { content: ''; position: absolute; inset: 0; border-radius: 8px; background: radial-gradient(ellipse at 50% 0%, var(--accent-dim), transparent 70%); pointer-events: none; }
     .logo { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
     h1 { font-family: var(--mono); font-size: 22px; font-weight: 700; margin-bottom: 8px; }
@@ -26,7 +26,6 @@
     input { width: 100%; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--mono); font-size: 13px; transition: all 0.2s; outline: none; }
     input:focus { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
     .error-msg { background: rgba(255,77,109,0.08); border: 1px solid var(--error); border-radius: 4px; padding: 10px 14px; font-family: var(--mono); font-size: 12px; color: var(--error); margin-bottom: 20px; }
-    .success-msg { background: rgba(0,255,157,0.08); border: 1px solid var(--success); border-radius: 4px; padding: 10px 14px; font-family: var(--mono); font-size: 12px; color: var(--success); margin-bottom: 20px; }
     .btn { width: 100%; padding: 14px; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
     .btn:hover { box-shadow: 0 0 24px var(--accent-glow); transform: translateY(-1px); }
     .link { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
@@ -38,22 +37,25 @@
 <body>
   <div class="card">
     <div class="logo">Multi-Agent System</div>
-    <h1>Welcome back</h1>
-    <p class="subtitle">Sign in to access the pipeline</p>
-    {% if registered %}<div class="success-msg">✅ Account created! Sign in below.</div>{% endif %}
+    <h1>Create account</h1>
+    <p class="subtitle">Join to access the pipeline</p>
     {% if error %}<div class="error-msg">❌ {{ error }}</div>{% endif %}
-    <form method="POST" action="/login">
+    <form method="POST" action="/register">
       <div class="field">
         <label for="username">Username</label>
-        <input type="text" id="username" name="username" placeholder="Enter username" required/>
+        <input type="text" id="username" name="username" placeholder="Choose a username" required minlength="3"/>
       </div>
       <div class="field">
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" placeholder="Enter password" required/>
+        <input type="password" id="password" name="password" placeholder="Min. 6 characters" required minlength="6"/>
       </div>
-      <button type="submit" class="btn">Sign In →</button>
+      <div class="field">
+        <label for="confirm">Confirm Password</label>
+        <input type="password" id="confirm" name="confirm" placeholder="Repeat your password" required/>
+      </div>
+      <button type="submit" class="btn">Create Account →</button>
     </form>
-    <div class="link">Don't have an account? <a href="/register">Register</a></div>
+    <div class="link">Already have an account? <a href="/login">Sign in</a></div>
   </div>
 </body>
 </html>
