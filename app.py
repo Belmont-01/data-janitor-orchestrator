@@ -41,6 +41,9 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get("logged_in"):
+            # Return JSON error for AJAX requests instead of redirecting
+            if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.path.startswith("/upload"):
+                return jsonify({"success": False, "error": "Session expired. Please refresh the page and sign in again."}), 401
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
