@@ -573,8 +573,14 @@
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) setFile(file);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      // Transfer dropped files to the file input so formData picks them all up
+      const dt = new DataTransfer();
+      for (const f of files) dt.items.add(f);
+      fileInput.files = dt.files;
+      setFile(files[0]);
+    }
   });
 
   dropZone.addEventListener('click', e => {
