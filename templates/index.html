@@ -637,13 +637,23 @@
 
     try {
       const response = await fetch('/upload', { method: 'POST', body: formData });
-      const data = await response.json();
 
-      if (response.status === 401) {
+      // Check for session expiry BEFORE parsing JSON
+      // (expired session returns HTML login page, not JSON)
+      if (response.status === 401 || response.redirected) {
         addLog('Session expired — please sign in again.', 'error');
         showError('Your session expired. Please refresh the page and sign in again.');
         return;
       }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        addLog('Session expired — please sign in again.', 'error');
+        showError('Your session expired. Please refresh the page and sign in again.');
+        return;
+      }
+
+      const data = await response.json();
 
       if (data.success && data.results) {
         const succeeded = data.results.filter(r => r.success);
