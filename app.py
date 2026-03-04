@@ -14,16 +14,19 @@ from errors import (
 
 load_dotenv(find_dotenv())
 
-# Fix working directory
+# Fix working directory so all relative paths work correctly
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Ensure output directories exist on startup
+os.makedirs("data/clean", exist_ok=True)
+os.makedirs("data/raw", exist_ok=True)
 
 from orchestrator.boss import run_pipeline
 
 app = Flask(__name__)
 
 # -------------------------------------------------------------------
-# Security config — all values come from environment variables
-# Never hardcode credentials here
+# Security config — all values from environment variables
 # -------------------------------------------------------------------
 app.secret_key = os.getenv("SECRET_KEY", "change-this-in-production")
 APP_USERNAME = os.getenv("APP_USERNAME", "admin")
@@ -37,7 +40,6 @@ ALLOWED_EXTENSIONS = {".csv", ".pdf", ".xlsx", ".xls", ".txt", ".json"}
 # -------------------------------------------------------------------
 
 def login_required(f):
-    """Decorator that redirects to login if user is not authenticated."""
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get("logged_in"):
@@ -101,13 +103,14 @@ def upload():
         }), 400
 
     suffix = os.path.splitext(file.filename)[-1].lower()
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        file.save(tmp.name)
-        tmp_path = tmp.name
-
-    output_dir = "data/clean"
+    tmp_path = None
 
     try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+
+        output_dir = "data/clean"
         run_pipeline(tmp_path, output_dir)
 
         json_path = os.path.join(output_dir, "output.json")
@@ -144,11 +147,9 @@ def upload():
     except Exception as e:
         return jsonify({"success": False, "error": f"Unexpected error: {e}"}), 500
     finally:
-        if os.path.exists(tmp_path):
+        if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
 
 if __name__ == "__main__":
-    os.makedirs("data/clean", exist_ok=True)
-    os.makedirs("templates", exist_ok=True)
-    app.run(debug=False, port=5000)
+    app.run(debug=False, port=int(os.getenv("PORT", 5000)))

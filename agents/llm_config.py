@@ -4,10 +4,16 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
 
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    raise EnvironmentError(
+        "GOOGLE_API_KEY is not set. "
+        "Add it to your .env file locally or to Render's environment variables."
+    )
+
 # Single shared LLM instance for all agents
 llm = LLM(
-    model="gemini/gemini-3-flash-preview",
-    api_key=os.getenv("GOOGLE_API_KEY"),
-    max_rpm=10,
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    model="gemini/gemini-2.0-flash",
+    api_key=api_key,
+    max_rpm=10
 )

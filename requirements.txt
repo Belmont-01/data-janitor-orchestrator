@@ -1,14 +1,14 @@
 # Core AI & Agent framework
-crewai
+crewai[google-genai]
 google-generativeai
 
 # Data extraction
-pdfplumber       # PDF text extraction
-pandas           # CSV handling
-openpyxl         # Excel support
-pytesseract      # OCR wrapper
-Pillow           # Image processing for OCR
-pdf2image        # Convert PDF pages to images for OCR
+pdfplumber
+pandas
+openpyxl
+pytesseract
+Pillow
+pdf2image
 
 # Web UI
 flask
