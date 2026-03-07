@@ -193,8 +193,7 @@ def extract_from_json(filepath: str) -> str:
         return json.dumps(data, indent=2)
     except FileNotFoundError:
         raise FileIngestionError(
-            f"JSON file not found: '{filepath}'
-"
+            f"JSON file not found: '{filepath}'\n"
             f'Check that the file exists and the path is correct.'
         )
     except json.JSONDecodeError as e:
