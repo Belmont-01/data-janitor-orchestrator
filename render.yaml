@@ -3,7 +3,7 @@ services:
     name: data-janitor-orchestrator
     runtime: python
     buildCommand: bash build.sh
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 2
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 600 --workers 2 --keep-alive 5
     plan: starter
     envVars:
       - key: GOOGLE_API_KEY

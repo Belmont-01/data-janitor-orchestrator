@@ -28,7 +28,11 @@ init_db()
 from orchestrator.boss import run_pipeline
 
 app = Flask(__name__)
+from datetime import timedelta
 app.secret_key = os.getenv("SECRET_KEY", "change-this-in-production")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = True
 
 ALLOWED_EXTENSIONS = {".csv", ".pdf", ".xlsx", ".xls", ".txt", ".json", ".docx"}
 
@@ -88,6 +92,7 @@ def login():
         password = request.form.get("password", "").strip()
         user = authenticate_user(username, password)
         if user:
+            session.permanent = True
             session["logged_in"] = True
             session["user_id"] = user["id"]
             session["username"] = user["username"]
