@@ -16,3 +16,11 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: data-janitor-db
+          property: connectionString
+
+databases:
+  - name: data-janitor-db
+    plan: free

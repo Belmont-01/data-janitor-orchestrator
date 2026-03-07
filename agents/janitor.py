@@ -10,6 +10,28 @@ from crewai import Agent, Task, Crew
 from agents.llm_config import llm
 from errors import FileIngestionError, APIError, InvalidOutputError, AgentTimeoutError
 
+# -------------------------------------------------------------------
+# Text truncation — prevents sending huge files to the LLM
+# -------------------------------------------------------------------
+
+MAX_WORDS = 3000  # Maximum words to send to the LLM
+
+def truncate_text(text: str, max_words: int = MAX_WORDS) -> str:
+    """
+    Truncate text to max_words words to keep LLM calls fast.
+    Adds a note if truncation occurred so the LLM knows.
+    """
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    truncated = " ".join(words[:max_words])
+    return (
+        truncated +
+        f"\n\n[NOTE: Content truncated to {max_words} words for processing. "
+        f"Original document had {len(words)} words.]"
+    )
+
+
 # Point pytesseract to Tesseract installation on Windows
 import sys
 if sys.platform == "win32":
@@ -171,7 +193,8 @@ def extract_from_json(filepath: str) -> str:
         return json.dumps(data, indent=2)
     except FileNotFoundError:
         raise FileIngestionError(
-            f"JSON file not found: '{filepath}'"
+            f"JSON file not found: '{filepath}'
+"
             f'Check that the file exists and the path is correct.'
         )
     except json.JSONDecodeError as e:
@@ -188,7 +211,7 @@ def extract_from_docx(filepath: str) -> str:
         return text
     except FileNotFoundError:
         raise FileIngestionError(
-            f"Word document not found: '{filepath}'"
+            f"Word document not found: '{filepath}'\n"
             f"Check that the file exists and the path is correct."
         )
     except Exception as e:
@@ -220,7 +243,8 @@ def extract_raw_text(filepath: str) -> str:
             f"Supported types: .csv, .pdf, .xlsx, .xls, .txt, .json, .docx"
         )
 
-    return extractors[ext](filepath)
+    raw = extractors[ext](filepath)
+    return truncate_text(raw)
 
 
 # -------------------------------------------------------------------

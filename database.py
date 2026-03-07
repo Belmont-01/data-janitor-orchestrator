@@ -1,49 +1,112 @@
 """
-database.py — SQLite database setup and helper functions.
-Handles users and pipeline run history.
+database.py — Database setup and helpers.
+Uses PostgreSQL on Render (DATABASE_URL env var) and SQLite locally.
 """
 import os
 import json
-import sqlite3
 import hashlib
 import secrets
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "app.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+# -------------------------------------------------------------------
+# Connection — PostgreSQL on Render, SQLite locally
+# -------------------------------------------------------------------
 
 def get_db():
-    """Get a database connection."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if DATABASE_URL:
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn, "postgres"
+    else:
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "app.db")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn, "sqlite"
 
+
+def fetchall(cursor):
+    rows = cursor.fetchall()
+    if not rows:
+        return []
+    # Normalize to list of dicts
+    if hasattr(rows[0], 'keys'):
+        return [dict(r) for r in rows]
+    cols = [d[0] for d in cursor.description]
+    return [dict(zip(cols, r)) for r in rows]
+
+
+def fetchone(cursor):
+    row = cursor.fetchone()
+    if not row:
+        return None
+    if hasattr(row, 'keys'):
+        return dict(row)
+    cols = [d[0] for d in cursor.description]
+    return dict(zip(cols, row))
+
+
+def placeholder(db_type):
+    """Return the right parameter placeholder for each DB."""
+    return "%s" if db_type == "postgres" else "?"
+
+
+# -------------------------------------------------------------------
+# Init — create tables if they don't exist
+# -------------------------------------------------------------------
 
 def init_db():
-    """Create tables if they don't exist."""
-    conn = get_db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT UNIQUE NOT NULL,
-            password  TEXT NOT NULL,
-            salt      TEXT NOT NULL,
-            created   TEXT NOT NULL
-        );
+    conn, db_type = get_db()
+    cur = conn.cursor()
 
-        CREATE TABLE IF NOT EXISTS runs (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     INTEGER NOT NULL,
-            filename    TEXT NOT NULL,
-            status      TEXT NOT NULL,
-            clean_json  TEXT,
-            report      TEXT,
-            error       TEXT,
-            created     TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        );
-    """)
+    if db_type == "postgres":
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id       SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                salt     TEXT NOT NULL,
+                created  TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS runs (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id),
+                filename   TEXT NOT NULL,
+                status     TEXT NOT NULL,
+                clean_json TEXT,
+                report     TEXT,
+                error      TEXT,
+                created    TEXT NOT NULL
+            )
+        """)
+    else:
+        cur.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                username  TEXT UNIQUE NOT NULL,
+                password  TEXT NOT NULL,
+                salt      TEXT NOT NULL,
+                created   TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS runs (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                filename    TEXT NOT NULL,
+                status      TEXT NOT NULL,
+                clean_json  TEXT,
+                report      TEXT,
+                error       TEXT,
+                created     TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+        """)
+
     conn.commit()
     conn.close()
 
@@ -53,7 +116,6 @@ def init_db():
 # -------------------------------------------------------------------
 
 def hash_password(password: str, salt: str = None):
-    """Hash a password with a salt using SHA-256."""
     if salt is None:
         salt = secrets.token_hex(32)
     hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
@@ -61,7 +123,6 @@ def hash_password(password: str, salt: str = None):
 
 
 def verify_password(password: str, hashed: str, salt: str) -> bool:
-    """Verify a password against its hash."""
     check, _ = hash_password(password, salt)
     return check == hashed
 
@@ -71,42 +132,41 @@ def verify_password(password: str, hashed: str, salt: str) -> bool:
 # -------------------------------------------------------------------
 
 def create_user(username: str, password: str) -> dict:
-    """
-    Create a new user. Returns dict with success/error.
-    """
     if len(username) < 3:
         return {"success": False, "error": "Username must be at least 3 characters."}
     if len(password) < 6:
         return {"success": False, "error": "Password must be at least 6 characters."}
 
     hashed, salt = hash_password(password)
-    conn = get_db()
+    conn, db_type = get_db()
+    p = placeholder(db_type)
     try:
-        conn.execute(
-            "INSERT INTO users (username, password, salt, created) VALUES (?, ?, ?, ?)",
+        cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO users (username, password, salt, created) VALUES ({p}, {p}, {p}, {p})",
             (username.lower().strip(), hashed, salt, datetime.utcnow().isoformat())
         )
         conn.commit()
         return {"success": True}
-    except sqlite3.IntegrityError:
-        return {"success": False, "error": "Username already taken. Please choose another."}
+    except Exception as e:
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            return {"success": False, "error": "Username already taken. Please choose another."}
+        return {"success": False, "error": f"Could not create account: {e}"}
     finally:
         conn.close()
 
 
 def get_user(username: str) -> dict:
-    """Get a user by username."""
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM users WHERE username = ?",
-        (username.lower().strip(),)
-    ).fetchone()
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(f"SELECT * FROM users WHERE username = {p}", (username.lower().strip(),))
+    row = fetchone(cur)
     conn.close()
-    return dict(row) if row else None
+    return row
 
 
 def authenticate_user(username: str, password: str) -> dict:
-    """Authenticate a user. Returns user dict or None."""
     user = get_user(username)
     if not user:
         return None
@@ -121,12 +181,13 @@ def authenticate_user(username: str, password: str) -> dict:
 
 def save_run(user_id: int, filename: str, status: str,
              clean_json=None, report=None, error=None):
-    """Save a pipeline run to the database."""
-    conn = get_db()
-    conn.execute(
-        """INSERT INTO runs
-           (user_id, filename, status, clean_json, report, error, created)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(
+        f"""INSERT INTO runs
+            (user_id, filename, status, clean_json, report, error, created)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})""",
         (
             user_id,
             filename,
@@ -142,39 +203,39 @@ def save_run(user_id: int, filename: str, status: str,
 
 
 def get_user_runs(user_id: int) -> list:
-    """Get all pipeline runs for a user, newest first."""
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM runs WHERE user_id = ? ORDER BY created DESC",
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT * FROM runs WHERE user_id = {p} ORDER BY created DESC",
         (user_id,)
-    ).fetchall()
+    )
+    rows = fetchall(cur)
     conn.close()
-    runs = []
-    for row in rows:
-        r = dict(row)
-        if r["clean_json"]:
+    for r in rows:
+        if r.get("clean_json"):
             try:
                 r["clean_json"] = json.loads(r["clean_json"])
             except Exception:
                 pass
-        runs.append(r)
-    return runs
+    return rows
 
 
 def get_run(run_id: int, user_id: int) -> dict:
-    """Get a specific run, only if it belongs to the user."""
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM runs WHERE id = ? AND user_id = ?",
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT * FROM runs WHERE id = {p} AND user_id = {p}",
         (run_id, user_id)
-    ).fetchone()
+    )
+    row = fetchone(cur)
     conn.close()
     if not row:
         return None
-    r = dict(row)
-    if r["clean_json"]:
+    if row.get("clean_json"):
         try:
-            r["clean_json"] = json.loads(r["clean_json"])
+            row["clean_json"] = json.loads(row["clean_json"])
         except Exception:
             pass
-    return r
+    return row

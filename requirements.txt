@@ -11,6 +11,9 @@ pytesseract
 Pillow
 pdf2image
 
+# Database
+psycopg2-binary   # PostgreSQL driver
+
 # Web UI
 flask
 
