@@ -128,6 +128,18 @@ def init_db():
                 created    TEXT NOT NULL
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id     TEXT PRIMARY KEY,
+                filename   TEXT NOT NULL,
+                user_id    INTEGER NOT NULL,
+                status     TEXT NOT NULL,
+                clean_json TEXT,
+                report     TEXT,
+                error      TEXT,
+                created    TEXT NOT NULL
+            )
+        """)
     else:
         cur.executescript("""
             CREATE TABLE IF NOT EXISTS users (
@@ -147,6 +159,16 @@ def init_db():
                 error       TEXT,
                 created     TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id     TEXT PRIMARY KEY,
+                filename   TEXT NOT NULL,
+                user_id    INTEGER NOT NULL,
+                status     TEXT NOT NULL,
+                clean_json TEXT,
+                report     TEXT,
+                error      TEXT,
+                created    TEXT NOT NULL
             );
         """)
 
@@ -257,3 +279,63 @@ def get_run(run_id: int, user_id: int) -> dict:
         except Exception:
             pass
     return row
+
+# -------------------------------------------------------------------
+# Job store — persisted in DB so all workers can read results
+# -------------------------------------------------------------------
+
+def create_job(job_id: str, filename: str, user_id: int):
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO jobs (job_id, filename, user_id, status, created) VALUES ({p},{p},{p},{p},{p})",
+        (job_id, filename, user_id, "running", datetime.utcnow().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+
+def finish_job(job_id: str, clean_json=None, report=None, error=None):
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    status = "error" if error else "done"
+    cur.execute(
+        f"UPDATE jobs SET status={p}, clean_json={p}, report={p}, error={p} WHERE job_id={p}",
+        (
+            status,
+            json.dumps(clean_json) if clean_json else None,
+            report,
+            error,
+            job_id
+        )
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_job(job_id: str) -> dict:
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(f"SELECT * FROM jobs WHERE job_id = {p}", (job_id,))
+    row = fetchone(cur)
+    conn.close()
+    if not row:
+        return None
+    if row.get("clean_json"):
+        try:
+            row["clean_json"] = json.loads(row["clean_json"])
+        except Exception:
+            pass
+    return row
+
+
+def delete_job(job_id: str):
+    conn, db_type = get_db()
+    p = placeholder(db_type)
+    cur = conn.cursor()
+    cur.execute(f"DELETE FROM jobs WHERE job_id = {p}", (job_id,))
+    conn.commit()
+    conn.close()
