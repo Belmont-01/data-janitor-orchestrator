@@ -1,3 +1,7 @@
+databases:
+  - name: data-janitor-db
+    plan: free
+
 services:
   - type: web
     name: data-janitor-orchestrator
@@ -8,19 +12,13 @@ services:
     envVars:
       - key: GOOGLE_API_KEY
         sync: false
-      - key: APP_USERNAME
-        sync: false
-      - key: APP_PASSWORD
-        sync: false
       - key: SECRET_KEY
         sync: false
-      - key: PYTHON_VERSION
-        value: 3.12.0
       - key: DATABASE_URL
         fromDatabase:
           name: data-janitor-db
           property: connectionString
-
-databases:
-  - name: data-janitor-db
-    plan: free
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: RENDER
+        value: "true"

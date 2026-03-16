@@ -311,7 +311,13 @@ def run_janitor(filepath: str, output_path: str = "data/clean/output.json"):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     try:
         result_str = str(result).strip()
-        result_str = result_str.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        # FIX: robust JSON extraction — handles fences and prose before JSON
+        import re as _re
+        _match = _re.search(r'(\[.*?\]|\{.*?\})', result_str, _re.DOTALL)
+        if _match:
+            result_str = _match.group(1).strip()
+        else:
+            result_str = _re.sub(r'```[a-zA-Z]*', '', result_str).strip('`').strip()
         cleaned_data = json.loads(result_str)
         with open(output_path, "w") as f:
             json.dump(cleaned_data, f, indent=2)

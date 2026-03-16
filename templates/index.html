@@ -569,6 +569,7 @@
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script>
   const dropZone   = document.getElementById('dropZone');
   const fileInput  = document.getElementById('fileInput');
@@ -633,143 +634,155 @@
     runBtn.disabled = true;
   }
 
-  // --- Run pipeline ---
+  // --- Run pipeline (async with job polling) ---
   runBtn.addEventListener('click', async () => {
     if (!selectedFile) return;
 
-    // Reset UI
     hideError();
     results.classList.remove('visible');
     logSection.classList.add('visible');
     logBox.innerHTML = '';
     runBtn.disabled = true;
-    runBtn.innerHTML = '<span class="spinner"></span> Running Pipeline...';
+    runBtn.innerHTML = '<span class="spinner"></span> Uploading...';
 
-    addLog('Pipeline starting...', 'info');
+    addLog('Uploading file...', 'info');
     addLog(`File: ${selectedFile.name}`, 'info');
-    addLog('Janitor agent — cleaning data...', '');
 
     const formData = new FormData();
-    const files = fileInput.files.length > 0 ? fileInput.files : [selectedFile];
-    for (const f of files) { formData.append('file', f); }
+    formData.append('file', selectedFile);
+
+    let jobId = null;
 
     try {
       const response = await fetch('/upload', { method: 'POST', body: formData });
 
-      // Check for session expiry BEFORE parsing JSON
-      // (expired session returns HTML login page, not JSON)
-      if (response.status === 401 || response.redirected) {
-        addLog('Session expired — please sign in again.', 'error');
-        showError('Your session expired. Please refresh the page and sign in again.');
-        return;
-      }
-
+      // Handle session expiry
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
-        addLog('Session expired — please sign in again.', 'error');
-        showError('Your session expired. Please refresh the page and sign in again.');
+        showError('Session expired. Please refresh the page and sign in again.');
+        runBtn.disabled = false;
+        runBtn.innerHTML = 'Run Pipeline';
         return;
       }
 
       const data = await response.json();
 
-      if (data.success && data.results) {
-        const succeeded = data.results.filter(r => r.success);
-        const failed = data.results.filter(r => !r.success);
-        failed.forEach(r => addLog('Failed: ' + r.filename + ' — ' + r.error, 'error'));
-        succeeded.forEach(r => addLog('Complete: ' + r.filename, 'success'));
-        addLog('Pipeline finished: ' + succeeded.length + ' succeeded, ' + failed.length + ' failed',
-               succeeded.length > 0 ? 'success' : 'error');
-        const last = succeeded[succeeded.length - 1];
-        if (last) {
-          rawJsonData = last.clean_json;
-          rawReportData = last.report || '';
-          jsonOutput.textContent = JSON.stringify(last.clean_json, null, 2);
-          reportOutput.innerHTML = markdownToHtml(last.report || 'No report generated.');
-          results.classList.add('visible');
-        }
-        if (succeeded.length > 0) {
-          addLog('View all runs in History', 'info');
-        }
-      } else {
-        addLog('Error: ' + data.error, 'error');
-        showError(data.error);
+      if (!data.success) {
+        showError(data.error || 'Upload failed.');
+        runBtn.disabled = false;
+        runBtn.innerHTML = 'Run Pipeline';
+        return;
       }
+
+      // Check for file-level errors (e.g. unsupported type)
+      const jobs = data.jobs || [];
+      const errored = jobs.filter(j => j.error);
+      if (errored.length > 0) {
+        showError(errored[0].error);
+        runBtn.disabled = false;
+        runBtn.innerHTML = 'Run Pipeline';
+        return;
+      }
+
+      jobId = jobs[0]?.job_id;
+      if (!jobId) {
+        showError('No job ID returned from server.');
+        runBtn.disabled = false;
+        runBtn.innerHTML = 'Run Pipeline';
+        return;
+      }
+
+      addLog('File uploaded — pipeline starting...', 'info');
+      runBtn.innerHTML = '<span class="spinner"></span> Pipeline Running...';
+
+      // Poll /status/<job_id> every 3 seconds
+      await pollJobStatus(jobId);
+
     } catch (err) {
       addLog(`Network error: ${err.message}`, 'error');
-      showError(`Could not connect to the server. Make sure app.py is running.\n${err.message}`);
-    } finally {
+      showError(`Could not connect to the server.\n${err.message}`);
       runBtn.disabled = false;
       runBtn.innerHTML = 'Run Pipeline';
     }
   });
 
-  function addLog(text, type = '') {
-    const line = document.createElement('div');
-    line.className = `log-line ${type}`;
-    line.textContent = `> ${text}`;
-    logBox.appendChild(line);
-    logBox.scrollTop = logBox.scrollHeight;
-  }
+  async function pollJobStatus(jobId) {
+    const stages = [
+      { delay: 5000,  msg: 'Janitor agent — cleaning data...' },
+      { delay: 30000, msg: 'Researcher agent — analyzing patterns...' },
+      { delay: 60000, msg: 'Writer agent — generating report...' },
+    ];
+    let stageIdx = 0;
+    let elapsed = 0;
+    const POLL_INTERVAL = 3000;
 
-  function showError(msg) {
-    errorBox.textContent = `❌ ${msg}`;
-    errorBox.classList.add('visible');
-  }
+    return new Promise((resolve) => {
+      const interval = setInterval(async () => {
+        elapsed += POLL_INTERVAL;
 
-  function hideError() {
-    errorBox.classList.remove('visible');
-  }
+        // Show stage hints based on elapsed time
+        while (stageIdx < stages.length && elapsed >= stages[stageIdx].delay) {
+          addLog(stages[stageIdx].msg, '');
+          stageIdx++;
+        }
 
-  function copyContent(id) {
-    const el = document.getElementById(id);
-    navigator.clipboard.writeText(el.textContent).then(() => {
-      const btn = el.closest('.result-card').querySelector('.copy-btn');
-      btn.textContent = 'Copied!';
-      setTimeout(() => btn.textContent = 'Copy', 1500);
+        try {
+          const res = await fetch(`/status/${jobId}`);
+          const job = await res.json();
+
+          if (job.status === 'done') {
+            clearInterval(interval);
+            addLog('✓ Janitor complete', 'success');
+            addLog('✓ Researcher complete', 'success');
+            addLog('✓ Writer complete', 'success');
+            addLog('Pipeline finished successfully!', 'success');
+
+            rawJsonData = job.result.clean_json;
+            rawReportData = job.result.report || '';
+
+            jsonOutput.textContent = JSON.stringify(job.result.clean_json, null, 2);
+            reportOutput.innerHTML = markdownToHtml(job.result.report || 'No report generated.');
+            results.classList.add('visible');
+
+            runBtn.disabled = false;
+            runBtn.innerHTML = 'Run Pipeline';
+            resolve();
+
+          } else if (job.status === 'error') {
+            clearInterval(interval);
+            addLog(`Error: ${job.error}`, 'error');
+            showError(job.error);
+            runBtn.disabled = false;
+            runBtn.innerHTML = 'Run Pipeline';
+            resolve();
+
+          } else if (job.status === 'not_found') {
+            clearInterval(interval);
+            showError('Job not found. The server may have restarted. Please try again.');
+            runBtn.disabled = false;
+            runBtn.innerHTML = 'Run Pipeline';
+            resolve();
+          }
+          // else: still running — keep polling
+
+        } catch (err) {
+          clearInterval(interval);
+          showError(`Lost connection to server: ${err.message}`);
+          runBtn.disabled = false;
+          runBtn.innerHTML = 'Run Pipeline';
+          resolve();
+        }
+      }, POLL_INTERVAL);
     });
   }
 
-  // --- Download handlers ---
-  let rawJsonData = null;
-  let rawReportData = null;
-
-  function downloadFile(content, filename, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  document.getElementById('downloadJson').addEventListener('click', () => {
-    if (rawJsonData) {
-      downloadFile(JSON.stringify(rawJsonData, null, 2), 'clean_output.json', 'application/json');
-    }
-  });
-
-  document.getElementById('downloadReport').addEventListener('click', () => {
-    if (rawReportData) {
-      downloadFile(rawReportData, 'business_report.md', 'text/markdown');
-    }
-  });
-
-  // Basic markdown renderer
+    // FIX: marked.js for proper markdown rendering
   function markdownToHtml(md) {
-    return md
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
-      .replace(/(<li>.*<\/li>\n?)+/g, s => `<ul>${s}</ul>`)
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/^(?!<[hul])(.+)$/gm, '<p>$1</p>')
-      .replace(/<p><\/p>/g, '');
+    if (typeof marked !== 'undefined') {
+      return marked.parse(md);
+    }
+    // Fallback if marked not loaded
+    return md.replace(/\n/g, '<br>');
   }
 </script>
 </body>

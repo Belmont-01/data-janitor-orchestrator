@@ -1,18 +1,9 @@
-import multiprocessing
-
-# Server socket
+# Gunicorn production config — capped at 2 workers for Render free/starter tier
 bind = "0.0.0.0:10000"
-
-# Worker processes
-workers = multiprocessing.cpu_count() * 2 + 1
+workers = 2           # FIX: was cpu_count*2+1 — caused OOM on Render
 worker_class = "sync"
-worker_connections = 1000
-
-# Timeout — set high because AI pipeline can take a while
-timeout = 300
+timeout = 600         # 10 min — pipeline can take 3-5 min
 keepalive = 5
-
-# Logging
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"

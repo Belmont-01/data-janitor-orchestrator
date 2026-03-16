@@ -22,3 +22,5 @@ python-dotenv
 
 # Production server
 gunicorn
+
+bcrypt

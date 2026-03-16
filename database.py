@@ -1,14 +1,59 @@
 """
 database.py — Database setup and helpers.
 Uses PostgreSQL on Render (DATABASE_URL env var) and SQLite locally.
+Passwords hashed with bcrypt (strong) instead of SHA-256 (weak).
 """
 import os
 import json
-import hashlib
 import secrets
 from datetime import datetime
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# -------------------------------------------------------------------
+# Password hashing — bcrypt with fallback to sha256 if bcrypt missing
+# -------------------------------------------------------------------
+
+def _hash_bcrypt(password: str):
+    import bcrypt
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))
+    return hashed.decode(), "bcrypt"
+
+def _verify_bcrypt(password: str, hashed: str) -> bool:
+    import bcrypt
+    return bcrypt.checkpw(password.encode(), hashed.encode())
+
+def hash_password(password: str, salt: str = None):
+    """
+    Hash password with bcrypt. Returns (hashed, salt).
+    Salt is kept for legacy SHA-256 compatibility but bcrypt embeds its own salt.
+    """
+    try:
+        hashed, _ = _hash_bcrypt(password)
+        legacy_salt = salt or secrets.token_hex(4)  # short dummy salt for schema compat
+        return hashed, legacy_salt
+    except ImportError:
+        # Fallback: sha256 if bcrypt not installed yet
+        import hashlib
+        if salt is None:
+            salt = secrets.token_hex(32)
+        hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+        return hashed, salt
+
+def verify_password(password: str, hashed: str, salt: str) -> bool:
+    """Verify password — handles both bcrypt and legacy sha256 hashes."""
+    if hashed.startswith("$2b$") or hashed.startswith("$2a$"):
+        # bcrypt hash
+        try:
+            return _verify_bcrypt(password, hashed)
+        except ImportError:
+            return False
+    else:
+        # Legacy SHA-256
+        import hashlib
+        check = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+        return check == hashed
+
 
 # -------------------------------------------------------------------
 # Connection — PostgreSQL on Render, SQLite locally
@@ -33,7 +78,6 @@ def fetchall(cursor):
     rows = cursor.fetchall()
     if not rows:
         return []
-    # Normalize to list of dicts
     if hasattr(rows[0], 'keys'):
         return [dict(r) for r in rows]
     cols = [d[0] for d in cursor.description]
@@ -51,7 +95,6 @@ def fetchone(cursor):
 
 
 def placeholder(db_type):
-    """Return the right parameter placeholder for each DB."""
     return "%s" if db_type == "postgres" else "?"
 
 
@@ -109,22 +152,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-
-# -------------------------------------------------------------------
-# Password helpers
-# -------------------------------------------------------------------
-
-def hash_password(password: str, salt: str = None):
-    if salt is None:
-        salt = secrets.token_hex(32)
-    hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return hashed, salt
-
-
-def verify_password(password: str, hashed: str, salt: str) -> bool:
-    check, _ = hash_password(password, salt)
-    return check == hashed
 
 
 # -------------------------------------------------------------------
@@ -189,12 +216,9 @@ def save_run(user_id: int, filename: str, status: str,
             (user_id, filename, status, clean_json, report, error, created)
             VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})""",
         (
-            user_id,
-            filename,
-            status,
+            user_id, filename, status,
             json.dumps(clean_json) if clean_json else None,
-            report,
-            error,
+            report, error,
             datetime.utcnow().isoformat()
         )
     )
@@ -206,10 +230,7 @@ def get_user_runs(user_id: int) -> list:
     conn, db_type = get_db()
     p = placeholder(db_type)
     cur = conn.cursor()
-    cur.execute(
-        f"SELECT * FROM runs WHERE user_id = {p} ORDER BY created DESC",
-        (user_id,)
-    )
+    cur.execute(f"SELECT * FROM runs WHERE user_id = {p} ORDER BY created DESC", (user_id,))
     rows = fetchall(cur)
     conn.close()
     for r in rows:
@@ -225,10 +246,7 @@ def get_run(run_id: int, user_id: int) -> dict:
     conn, db_type = get_db()
     p = placeholder(db_type)
     cur = conn.cursor()
-    cur.execute(
-        f"SELECT * FROM runs WHERE id = {p} AND user_id = {p}",
-        (run_id, user_id)
-    )
+    cur.execute(f"SELECT * FROM runs WHERE id = {p} AND user_id = {p}", (run_id, user_id))
     row = fetchone(cur)
     conn.close()
     if not row:
