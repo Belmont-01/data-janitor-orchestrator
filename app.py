@@ -126,10 +126,10 @@ def run_detail(run_id):
 
 # --- Pipeline background worker ---
 
-def _run_pipeline_job(job_id, tmp_path, filename, output_dir, user_id):
+def _run_pipeline_job(job_id, tmp_path, filename, output_dir, user_id, user_prompt=''):
     import shutil
     try:
-        run_pipeline(tmp_path, output_dir)
+        run_pipeline(tmp_path, output_dir, user_prompt=user_prompt)
 
         clean_json, report_text = None, None
         json_path   = os.path.join(output_dir, "output.json")
@@ -193,11 +193,12 @@ def upload():
                 tmp_path = tmp.name
 
             user_id = session["user_id"]
+            user_prompt = request.form.get("prompt", "").strip()
             create_job(job_id, file.filename, user_id)
 
             t = threading.Thread(
                 target=_run_pipeline_job,
-                args=(job_id, tmp_path, file.filename, output_dir, user_id),
+                args=(job_id, tmp_path, file.filename, output_dir, user_id, user_prompt),
                 daemon=True
             )
             t.start()

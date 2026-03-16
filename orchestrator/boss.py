@@ -7,28 +7,34 @@ from agents.writer import writer
 from errors import FileIngestionError, APIError, InvalidOutputError, AgentTimeoutError, PipelineError
 
 
-def run_pipeline(input_filepath: str, output_dir: str = "data/clean"):
+def run_pipeline(input_filepath: str, output_dir: str = "data/clean", user_prompt: str = ""):
     """
-    The full multi-agent pipeline:
-    1. Janitor     → cleans raw data into structured JSON
-    2. Researcher  → finds patterns and insights in the clean data
-    3. Writer      → produces a professional summary report
+    The full multi-agent pipeline.
+    user_prompt: optional instructions from the user on how to organize/focus the output.
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # (1) File ingestion error — catch before anything else
     print(f"\n📂 Reading file: {input_filepath}")
     try:
         raw_text = extract_raw_text(input_filepath)
     except FileIngestionError as e:
         print(f"\n❌ FILE ERROR: {e}")
-        print("Fix the file path or file contents and try again.")
         return None
 
     print(f"✅ Extracted {len(raw_text)} characters of raw text.\n")
 
+    # Build the user instruction block — injected into Janitor and Writer
+    if user_prompt and user_prompt.strip():
+        user_instruction = (
+            f"\n\nSPECIAL INSTRUCTIONS FROM THE USER:\n"
+            f"\"{user_prompt.strip()}\"\n"
+            f"Follow these instructions carefully when organizing and presenting the output.\n"
+        )
+    else:
+        user_instruction = ""
+
     # ------------------------------------------------------------------
-    # Task definitions
+    # Janitor task — clean + organize per user instructions
     # ------------------------------------------------------------------
     task_clean = Task(
         description=(
@@ -37,13 +43,18 @@ def run_pipeline(input_filepath: str, output_dir: str = "data/clean"):
             "Please do the following:\n"
             "1. Identify any data quality issues (missing fields, bad formatting, duplicates).\n"
             "2. Clean and standardize the data.\n"
-            "3. Return ONLY a valid JSON array of cleaned records. "
+            "3. Organize the records according to any special instructions below.\n"
+            "4. Return ONLY a valid JSON array of cleaned records. "
             "No explanation, no markdown, just raw JSON."
+            f"{user_instruction}"
         ),
-        expected_output="A valid JSON array of cleaned records.",
+        expected_output="A valid JSON array of cleaned and organized records.",
         agent=janitor
     )
 
+    # ------------------------------------------------------------------
+    # Researcher task — analyze with user focus in mind
+    # ------------------------------------------------------------------
     task_research = Task(
         description=(
             "You have received cleaned, structured data from the Data Janitor. "
@@ -53,12 +64,16 @@ def run_pipeline(input_filepath: str, output_dir: str = "data/clean"):
             "3. Important statistics (totals, averages, distributions)\n"
             "4. Any correlations between fields\n\n"
             "Present your findings as a clear, numbered list of insights."
+            f"{user_instruction}"
         ),
         expected_output="A numbered list of data insights and patterns.",
         agent=researcher,
         context=[task_clean]
     )
 
+    # ------------------------------------------------------------------
+    # Writer task — report tailored to user instructions
+    # ------------------------------------------------------------------
     task_report = Task(
         description=(
             "You have received analytical findings from the Data Research Analyst. "
@@ -67,6 +82,7 @@ def run_pipeline(input_filepath: str, output_dir: str = "data/clean"):
             "2. **Key Findings** — The most important insights in plain English\n"
             "3. **Recommendations** — 2-3 actionable next steps based on the findings\n\n"
             "Write for a non-technical business audience. Keep it concise and clear."
+            f"{user_instruction}"
         ),
         expected_output="A professional business report in markdown format.",
         agent=writer,
@@ -82,10 +98,11 @@ def run_pipeline(input_filepath: str, output_dir: str = "data/clean"):
     )
 
     print("🤖 Orchestrator starting the pipeline...\n")
+    if user_prompt:
+        print(f"📝 User instructions: {user_prompt}\n")
     print("Flow: Janitor → Researcher → Writer\n")
     print("-" * 50)
 
-    # (2) API errors + (4) Timeout errors
     try:
         result = crew.kickoff()
     except TimeoutError:
@@ -102,11 +119,16 @@ def run_pipeline(input_filepath: str, output_dir: str = "data/clean"):
             )
         raise
 
-    # (3) Save and validate Janitor JSON output
+    # Save and validate Janitor JSON output
     json_output_path = os.path.join(output_dir, "output.json")
     try:
+        import re as _re
         raw_output = str(task_clean.output.raw).strip()
-        raw_output = raw_output.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        _match = _re.search(r'(\[.*?\]|\{.*?\})', raw_output, _re.DOTALL)
+        if _match:
+            raw_output = _match.group(1).strip()
+        else:
+            raw_output = _re.sub(r'```[a-zA-Z]*', '', raw_output).strip('`').strip()
         clean_json = json.loads(raw_output)
         with open(json_output_path, "w") as f:
             json.dump(clean_json, f, indent=2)

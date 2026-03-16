@@ -34,6 +34,18 @@
     .pipeline-step { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 5px 12px; border: 1px solid var(--border); border-radius: 2px; letter-spacing: 0.08em; }
     .pipeline-arrow { color: var(--accent); font-size: 14px; }
 
+    /* Prompt input */
+    .prompt-wrap { margin-bottom: 16px; animation: fadeUp 0.6s 0.15s ease both; }
+    .prompt-label { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+    .prompt-input {
+      width: 100%; padding: 12px 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+      color: var(--text); font-family: var(--sans); font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s; outline: none; resize: vertical; min-height: 52px;
+    }
+    .prompt-input::placeholder { color: var(--muted); }
+    .prompt-input:focus { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+
     /* Upload area — completely separate from run button */
     .upload-area { border: 1.5px dashed var(--border); border-radius: 8px; padding: 48px 40px; text-align: center; background: var(--surface); position: relative; overflow: hidden; animation: fadeUp 0.6s 0.2s ease both; transition: all 0.25s ease; }
     .upload-area::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, var(--accent-dim) 0%, transparent 70%); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
@@ -138,6 +150,17 @@
       <div class="pipeline-step">📊 Report</div>
     </div>
   </header>
+
+  <!-- User prompt -->
+  <div class="prompt-wrap">
+    <label class="prompt-label" for="userPrompt">Instructions (optional)</label>
+    <textarea
+      class="prompt-input"
+      id="userPrompt"
+      placeholder="e.g. Organize by date newest first, group by department, flag salaries above 50000, write the report for a non-technical audience..."
+      rows="2"
+    ></textarea>
+  </div>
 
   <!-- Upload area — clicking opens file picker -->
   <div class="upload-area" id="uploadArea">
@@ -291,8 +314,10 @@ function startPipeline() {
 
   addLog('Uploading file: ' + selectedFile.name, 'info');
 
+  var userPrompt = document.getElementById('userPrompt').value.trim();
   var formData = new FormData();
   formData.append('file', selectedFile);
+  if (userPrompt) formData.append('prompt', userPrompt);
 
   fetch('/upload', { method: 'POST', body: formData })
     .then(function(res) {
