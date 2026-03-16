@@ -603,12 +603,18 @@
   });
 
   dropZone.addEventListener('click', e => {
-    if (e.target === removeFile) return;
+    // Only open file picker if clicking inside the drop zone, not on the remove button
+    if (e.target === removeFile || e.target.closest('#removeFile')) return;
+    // Don't fire if the click came from outside (bubbled up)
+    if (!dropZone.contains(e.target)) return;
     fileInput.click();
   });
 
   fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) setFile(fileInput.files[0]);
+    // Only update if user actually picked a new file (not cancelled)
+    if (fileInput.files && fileInput.files.length > 0) {
+      setFile(fileInput.files[0]);
+    }
   });
 
   removeFile.addEventListener('click', e => {
@@ -635,7 +641,8 @@
   }
 
   // --- Run pipeline (async with job polling) ---
-  runBtn.addEventListener('click', async () => {
+  runBtn.addEventListener('click', async (e) => {
+    e.stopPropagation(); // prevent click bubbling into dropZone
     if (!selectedFile) return;
 
     hideError();
