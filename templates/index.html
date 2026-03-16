@@ -7,491 +7,124 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0a0a0f;
-      --surface: #111118;
-      --border: #1e1e2e;
-      --accent: #00ff9d;
-      --accent-dim: rgba(0,255,157,0.12);
-      --accent-glow: rgba(0,255,157,0.35);
-      --text: #e8e8f0;
-      --muted: #5a5a7a;
-      --error: #ff4d6d;
-      --warning: #ffd166;
-      --mono: 'Space Mono', monospace;
-      --sans: 'DM Sans', sans-serif;
+      --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
+      --accent: #00ff9d; --accent-dim: rgba(0,255,157,0.12);
+      --accent-glow: rgba(0,255,157,0.35); --text: #e8e8f0;
+      --muted: #5a5a7a; --error: #ff4d6d; --warning: #ffd166;
+      --mono: 'Space Mono', monospace; --sans: 'DM Sans', sans-serif;
     }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Grid background */
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
     body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none; z-index: 0;
     }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 60px 24px;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Header */
-    header {
-      margin-bottom: 56px;
-      animation: fadeDown 0.6s ease both;
-    }
-
-    .badge {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      padding: 4px 10px;
-      border-radius: 2px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      font-family: var(--mono);
-      font-size: clamp(28px, 5vw, 44px);
-      font-weight: 700;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      margin-bottom: 14px;
-    }
-
+    .container { max-width: 900px; margin: 0 auto; padding: 60px 24px; position: relative; z-index: 1; }
+    nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+    .nav-left { display: flex; gap: 12px; align-items: center; }
+    .nav-link { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: 2px; letter-spacing: 0.06em; transition: all 0.2s; }
+    .nav-link:hover, .nav-link.active { color: var(--accent); border-color: var(--accent); }
+    header { margin-bottom: 56px; animation: fadeDown 0.6s ease both; }
+    .badge { display: inline-block; font-family: var(--mono); font-size: 11px; color: var(--accent); border: 1px solid var(--accent); padding: 4px 10px; border-radius: 2px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 20px; }
+    h1 { font-family: var(--mono); font-size: clamp(28px, 5vw, 44px); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 14px; }
     h1 span { color: var(--accent); }
+    .subtitle { color: var(--muted); font-size: 15px; font-weight: 300; line-height: 1.6; max-width: 520px; }
+    .pipeline { display: flex; align-items: center; gap: 8px; margin-top: 28px; flex-wrap: wrap; }
+    .pipeline-step { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 5px 12px; border: 1px solid var(--border); border-radius: 2px; letter-spacing: 0.08em; }
+    .pipeline-arrow { color: var(--accent); font-size: 14px; }
 
-    .subtitle {
-      color: var(--muted);
-      font-size: 15px;
-      font-weight: 300;
-      line-height: 1.6;
-      max-width: 520px;
-    }
-
-    /* Pipeline indicator */
-    .pipeline {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 28px;
-      flex-wrap: wrap;
-    }
-
-    .pipeline-step {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      padding: 5px 12px;
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      letter-spacing: 0.08em;
-    }
-
-    .pipeline-arrow {
-      color: var(--accent);
-      font-size: 14px;
-    }
-
-    /* Drop zone */
-    .drop-zone {
-      border: 1.5px dashed var(--border);
-      border-radius: 8px;
-      padding: 60px 40px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      background: var(--surface);
-      position: relative;
-      overflow: hidden;
-      animation: fadeUp 0.6s 0.2s ease both;
-    }
-
-    .drop-zone::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at 50% 0%, var(--accent-dim) 0%, transparent 70%);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .drop-zone:hover::before,
-    .drop-zone.drag-over::before { opacity: 1; }
-
-    .drop-zone:hover,
-    .drop-zone.drag-over {
-      border-color: var(--accent);
-      box-shadow: 0 0 30px var(--accent-glow);
-    }
-
-    .drop-icon {
-      width: 52px;
-      height: 52px;
-      margin: 0 auto 20px;
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      transition: all 0.25s ease;
-      background: var(--bg);
-    }
-
-    .drop-zone:hover .drop-icon,
-    .drop-zone.drag-over .drop-icon {
-      border-color: var(--accent);
-      box-shadow: 0 0 16px var(--accent-glow);
-    }
-
-    .drop-zone h2 {
-      font-family: var(--mono);
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .drop-zone p {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 24px;
-    }
-
-    .file-types {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .file-type {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--accent);
-      border: 1px solid var(--accent-dim);
-      padding: 3px 8px;
-      border-radius: 2px;
-      letter-spacing: 0.08em;
-      background: var(--accent-dim);
-    }
-
+    /* Upload area — completely separate from run button */
+    .upload-area { border: 1.5px dashed var(--border); border-radius: 8px; padding: 48px 40px; text-align: center; background: var(--surface); position: relative; overflow: hidden; animation: fadeUp 0.6s 0.2s ease both; transition: all 0.25s ease; }
+    .upload-area::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, var(--accent-dim) 0%, transparent 70%); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+    .upload-area.drag-over::before, .upload-area:hover::before { opacity: 1; }
+    .upload-area.drag-over, .upload-area:hover { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-glow); }
+    .upload-icon { width: 52px; height: 52px; margin: 0 auto 20px; border: 1.5px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; background: var(--bg); transition: all 0.25s; }
+    .upload-area:hover .upload-icon, .upload-area.drag-over .upload-icon { border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow); }
+    .upload-area h2 { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-bottom: 8px; pointer-events: none; }
+    .upload-area p { color: var(--muted); font-size: 13px; margin-bottom: 24px; pointer-events: none; }
+    .file-types { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; pointer-events: none; }
+    .file-type { font-family: var(--mono); font-size: 10px; color: var(--accent); border: 1px solid var(--accent-dim); padding: 3px 8px; border-radius: 2px; letter-spacing: 0.08em; background: var(--accent-dim); }
     #fileInput { display: none; }
 
-    /* Selected file indicator */
-    .file-selected {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      margin-top: 20px;
-      padding: 12px 16px;
-      background: var(--accent-dim);
-      border: 1px solid var(--accent);
-      border-radius: 4px;
-      animation: fadeUp 0.3s ease both;
-    }
+    /* File selected pill */
+    #filePill { display: none; align-items: center; gap: 12px; margin-top: 20px; padding: 12px 16px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: 4px; }
+    #filePill.show { display: flex; }
+    #filePillName { font-family: var(--mono); font-size: 12px; color: var(--accent); flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #filePillRemove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+    #filePillRemove:hover { color: var(--error); }
 
-    .file-selected.visible { display: flex; }
-
-    .file-selected-name {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--accent);
-      flex: 1;
-      text-align: left;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .remove-file {
-      background: none;
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 16px;
-      padding: 0 4px;
-      transition: color 0.2s;
-    }
-    .remove-file:hover { color: var(--error); }
-
-    /* Run button */
-    .run-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      width: 100%;
-      padding: 16px;
-      margin-top: 16px;
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
-      border-radius: 4px;
-      font-family: var(--mono);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s ease;
+    /* Run button — standalone, nothing to do with upload area */
+    #runBtn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 16px; margin-top: 16px;
+      background: var(--accent); color: var(--bg); border: none; border-radius: 4px;
+      font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; cursor: pointer; transition: all 0.2s ease;
       animation: fadeUp 0.6s 0.3s ease both;
     }
+    #runBtn:hover:not(:disabled) { box-shadow: 0 0 24px var(--accent-glow); transform: translateY(-1px); }
+    #runBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-    .run-btn:hover:not(:disabled) {
-      box-shadow: 0 0 24px var(--accent-glow);
-      transform: translateY(-1px);
-    }
+    .spinner { width: 14px; height: 14px; border: 2px solid var(--bg); border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; flex-shrink: 0; }
 
-    .run-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    /* Progress log */
-    .log-section {
-      display: none;
-      margin-top: 32px;
-      animation: fadeUp 0.4s ease both;
-    }
-
-    .log-section.visible { display: block; }
-
-    .section-label {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-label::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
-    .log-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 20px;
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.8;
-      color: var(--muted);
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
+    /* Log */
+    #logSection { display: none; margin-top: 32px; }
+    #logSection.show { display: block; }
+    .section-label { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    #logBox { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; font-family: var(--mono); font-size: 12px; line-height: 1.8; color: var(--muted); max-height: 200px; overflow-y: auto; }
     .log-line { margin-bottom: 2px; }
     .log-line.success { color: var(--accent); }
-    .log-line.error { color: var(--error); }
-    .log-line.info { color: var(--warning); }
+    .log-line.error   { color: var(--error); }
+    .log-line.info    { color: var(--warning); }
 
-    /* Spinner */
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid var(--bg);
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-    }
+    /* Error */
+    #errorBox { display: none; margin-top: 24px; padding: 16px 20px; background: rgba(255,77,109,0.08); border: 1px solid var(--error); border-radius: 4px; font-family: var(--mono); font-size: 12px; color: var(--error); line-height: 1.7; }
+    #errorBox.show { display: block; }
 
     /* Results */
-    .results {
-      display: none;
-      margin-top: 32px;
-      gap: 24px;
-      flex-direction: column;
-      animation: fadeUp 0.5s ease both;
-    }
-
-    .results.visible { display: flex; }
-
-    .result-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .result-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .result-card-title {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--accent);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    .card-actions {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .copy-btn, .download-btn {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      background: none;
-      border: 1px solid var(--border);
-      padding: 4px 10px;
-      border-radius: 2px;
-      cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.06em;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .copy-btn:hover, .download-btn:hover {
-      color: var(--accent);
-      border-color: var(--accent);
-    }
-
-    .download-btn {
-      color: var(--accent);
-      border-color: var(--accent);
-      background: var(--accent-dim);
-    }
-
-    .download-btn:hover {
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
-
-    .result-card-body {
-      padding: 20px;
-      max-height: 360px;
-      overflow-y: auto;
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.7;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    /* Report markdown rendering */
-    .report-body { font-family: var(--sans); font-size: 14px; }
-    .report-body h1, .report-body h2, .report-body h3 {
-      font-family: var(--mono);
-      color: var(--accent);
-      margin: 16px 0 8px;
-      font-size: 13px;
-      letter-spacing: 0.06em;
-    }
+    #results { display: none; margin-top: 32px; gap: 24px; flex-direction: column; }
+    #results.show { display: flex; }
+    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .result-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .result-card-title { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; }
+    .card-actions { display: flex; gap: 8px; }
+    .copy-btn, .dl-btn { font-family: var(--mono); font-size: 11px; background: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 2px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em; color: var(--muted); }
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .dl-btn { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+    .dl-btn:hover { box-shadow: 0 0 12px var(--accent-glow); }
+    .result-card-body { padding: 20px; max-height: 360px; overflow-y: auto; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .report-body { font-family: var(--sans); font-size: 14px; white-space: normal; }
+    .report-body h1, .report-body h2, .report-body h3 { font-family: var(--mono); color: var(--accent); margin: 16px 0 8px; font-size: 13px; letter-spacing: 0.06em; }
     .report-body p { margin-bottom: 10px; color: var(--text); line-height: 1.7; }
     .report-body strong { color: var(--accent); font-weight: 600; }
     .report-body ul, .report-body ol { padding-left: 20px; margin-bottom: 10px; }
     .report-body li { margin-bottom: 4px; line-height: 1.6; }
 
-    /* Error box */
-    .error-box {
-      display: none;
-      margin-top: 24px;
-      padding: 16px 20px;
-      background: rgba(255,77,109,0.08);
-      border: 1px solid var(--error);
-      border-radius: 4px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--error);
-      line-height: 1.7;
-      animation: fadeUp 0.3s ease both;
-    }
-
-    .error-box.visible { display: block; }
-
-    /* Scrollbar */
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-    @keyframes fadeDown {
-      from { opacity: 0; transform: translateY(-16px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes fadeDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeUp   { from { opacity: 0; transform: translateY(12px);  } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin     { to   { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 <div class="container">
 
-  <nav style="display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;">
-    <div style="display:flex;gap:12px;align-items:center;">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="40" height="40" style="flex-shrink:0">
-  <defs>
-    <radialGradient id="bg2" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#111118"/><stop offset="100%" stop-color="#0a0a0f"/></radialGradient>
-    <filter id="tg2" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="lg2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <clipPath id="cc2"><circle cx="200" cy="200" r="180"/></clipPath>
-  </defs>
-  <circle cx="200" cy="200" r="200" fill="#0a0a0f"/>
-  <circle cx="200" cy="200" r="200" fill="url(#bg2)"/>
-  <circle cx="200" cy="200" r="178" fill="none" stroke="#1e1e2e" stroke-width="1.5"/>
-  <g clip-path="url(#cc2)" opacity="0.07">
-    <line x1="20" y1="200" x2="380" y2="200" stroke="#00ff9d" stroke-width="0.8"/>
-    <line x1="200" y1="20" x2="200" y2="380" stroke="#00ff9d" stroke-width="0.8"/>
-  </g>
-  <polygon points="200,48 330,124 330,276 200,352 70,276 70,124" fill="none" stroke="#1e1e2e" stroke-width="1.5" filter="url(#lg2)"/>
-  <polygon points="200,82 306,141 306,259 200,318 94,259 94,141" fill="none" stroke="#00ff9d" stroke-width="0.8" opacity="0.25"/>
-  <text x="200" y="215" font-family="Courier New,monospace" font-size="96" font-weight="700" fill="#00ff9d" text-anchor="middle" dominant-baseline="middle" letter-spacing="-4" filter="url(#tg2)">DJ&amp;O</text>
-</svg>
-      <a href="/" style="font-family:var(--mono);font-size:12px;color:var(--accent);text-decoration:none;border:1px solid var(--accent);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;">Pipeline</a>
-      <a href="/history" style="font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;transition:all 0.2s;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">History</a>
+  <nav>
+    <div class="nav-left">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="36" height="36" style="flex-shrink:0"><defs><radialGradient id="nbg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#111118"/><stop offset="100%" stop-color="#0a0a0f"/></radialGradient><filter id="ntg"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="200" cy="200" r="200" fill="url(#nbg)"/><circle cx="200" cy="200" r="178" fill="none" stroke="#1e1e2e" stroke-width="1.5"/><polygon points="200,48 330,124 330,276 200,352 70,276 70,124" fill="none" stroke="#1e1e2e" stroke-width="1.5"/><polygon points="200,82 306,141 306,259 200,318 94,259 94,141" fill="none" stroke="#00ff9d" stroke-width="0.8" opacity="0.25"/><text x="200" y="215" font-family="Courier New,monospace" font-size="96" font-weight="700" fill="#00ff9d" text-anchor="middle" dominant-baseline="middle" letter-spacing="-4" filter="url(#ntg)">DJ&amp;O</text></svg>
+      <a href="/" class="nav-link active">Pipeline</a>
+      <a href="/history" class="nav-link">History</a>
     </div>
-    <a href="/logout" style="font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;">Sign Out</a>
+    <a href="/logout" class="nav-link">Sign Out</a>
   </nav>
+
   <header>
     <div class="badge">Multi-Agent System</div>
-    <h1>Data <span>Janitor</span><br>& Orchestrator</h1>
+    <h1>Data <span>Janitor</span><br>&amp; Orchestrator</h1>
     <p class="subtitle">Upload any messy file — the agent pipeline will clean it, analyze it, and write you a business report.</p>
     <div class="pipeline">
       <div class="pipeline-step">📄 Your File</div>
@@ -506,9 +139,9 @@
     </div>
   </header>
 
-  <!-- Drop Zone -->
-  <div class="drop-zone" id="dropZone">
-    <div class="drop-icon">📁</div>
+  <!-- Upload area — clicking opens file picker -->
+  <div class="upload-area" id="uploadArea">
+    <div class="upload-icon">📁</div>
     <h2>Drop your file here</h2>
     <p>or click to browse</p>
     <div class="file-types">
@@ -519,278 +152,290 @@
       <span class="file-type">.JSON</span>
       <span class="file-type">.DOCX</span>
     </div>
-    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt,.json,.docx" multiple/>
-    <div class="file-selected" id="fileSelected">
+    <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls,.txt,.json,.docx"/>
+    <div id="filePill">
       <span>📄</span>
-      <span class="file-selected-name" id="fileName"></span>
-      <button class="remove-file" id="removeFile" title="Remove file">✕</button>
+      <span id="filePillName"></span>
+      <button id="filePillRemove" type="button">✕</button>
     </div>
   </div>
 
-  <button class="run-btn" id="runBtn" disabled>
-    Run Pipeline
-  </button>
+  <!-- Run button — completely outside upload area -->
+  <button type="button" id="runBtn" disabled>Run Pipeline</button>
 
-  <!-- Error -->
-  <div class="error-box" id="errorBox"></div>
+  <div id="errorBox"></div>
 
-  <!-- Log -->
-  <div class="log-section" id="logSection">
+  <div id="logSection">
     <div class="section-label">Agent Log</div>
-    <div class="log-box" id="logBox"></div>
+    <div id="logBox"></div>
   </div>
 
-  <!-- Results -->
-  <div class="results" id="results">
-
+  <div id="results">
     <div class="result-card">
       <div class="result-card-header">
         <span class="result-card-title">🧹 Clean JSON Output</span>
         <div class="card-actions">
-          <button class="copy-btn" onclick="copyContent('jsonOutput')">Copy</button>
-          <button class="download-btn" id="downloadJson">⬇ Download JSON</button>
+          <button class="copy-btn" id="copyJson">Copy</button>
+          <button class="dl-btn" id="dlJson">⬇ Download JSON</button>
         </div>
       </div>
       <div class="result-card-body" id="jsonOutput"></div>
     </div>
-
     <div class="result-card">
       <div class="result-card-header">
         <span class="result-card-title">✍️ Business Report</span>
         <div class="card-actions">
-          <button class="copy-btn" onclick="copyContent('reportOutput')">Copy</button>
-          <button class="download-btn" id="downloadReport">⬇ Download Report</button>
+          <button class="copy-btn" id="copyReport">Copy</button>
+          <button class="dl-btn" id="dlReport">⬇ Download Report</button>
         </div>
       </div>
       <div class="result-card-body report-body" id="reportOutput"></div>
     </div>
-
   </div>
 
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script>
-  const dropZone   = document.getElementById('dropZone');
-  const fileInput  = document.getElementById('fileInput');
-  const fileSelected = document.getElementById('fileSelected');
-  const fileName   = document.getElementById('fileName');
-  const removeFile = document.getElementById('removeFile');
-  const runBtn     = document.getElementById('runBtn');
-  const errorBox   = document.getElementById('errorBox');
-  const logSection = document.getElementById('logSection');
-  const logBox     = document.getElementById('logBox');
-  const results    = document.getElementById('results');
-  const jsonOutput = document.getElementById('jsonOutput');
-  const reportOutput = document.getElementById('reportOutput');
+// ---------------------------------------------------------------
+// Element refs
+// ---------------------------------------------------------------
+var uploadArea   = document.getElementById('uploadArea');
+var fileInput    = document.getElementById('fileInput');
+var filePill     = document.getElementById('filePill');
+var filePillName = document.getElementById('filePillName');
+var filePillRemove = document.getElementById('filePillRemove');
+var runBtn       = document.getElementById('runBtn');
+var errorBox     = document.getElementById('errorBox');
+var logSection   = document.getElementById('logSection');
+var logBox       = document.getElementById('logBox');
+var results      = document.getElementById('results');
+var jsonOutput   = document.getElementById('jsonOutput');
+var reportOutput = document.getElementById('reportOutput');
+var copyJsonBtn  = document.getElementById('copyJson');
+var copyReportBtn= document.getElementById('copyReport');
+var dlJsonBtn    = document.getElementById('dlJson');
+var dlReportBtn  = document.getElementById('dlReport');
 
-  let selectedFile = null;
+var selectedFile = null;
+var rawJson      = null;
+var rawReport    = null;
 
-  // --- Drag and drop ---
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      // Transfer dropped files to the file input so formData picks them all up
-      const dt = new DataTransfer();
-      for (const f of files) dt.items.add(f);
-      fileInput.files = dt.files;
-      setFile(files[0]);
-    }
-  });
+// ---------------------------------------------------------------
+// File selection — upload area click opens picker
+// ---------------------------------------------------------------
+uploadArea.addEventListener('click', function(e) {
+  // Don't open picker if clicking the remove button
+  if (e.target === filePillRemove || e.target.closest('#filePillRemove')) return;
+  fileInput.click();
+});
 
-  dropZone.addEventListener('click', e => {
-    // Only open file picker if clicking inside the drop zone, not on the remove button
-    if (e.target === removeFile || e.target.closest('#removeFile')) return;
-    // Don't fire if the click came from outside (bubbled up)
-    if (!dropZone.contains(e.target)) return;
-    fileInput.click();
-  });
-
-  fileInput.addEventListener('change', () => {
-    // Only update if user actually picked a new file (not cancelled)
-    if (fileInput.files && fileInput.files.length > 0) {
-      setFile(fileInput.files[0]);
-    }
-  });
-
-  removeFile.addEventListener('click', e => {
-    e.stopPropagation();
-    clearFile();
-  });
-
-  function setFile(file) {
-    selectedFile = file;
-    const files = fileInput.files;
-    fileName.textContent = files.length > 1 ? `${files.length} files selected` : file.name;
-    fileSelected.classList.add('visible');
-    runBtn.disabled = false;
-    hideError();
-    results.classList.remove('visible');
-    logSection.classList.remove('visible');
+fileInput.addEventListener('change', function() {
+  if (fileInput.files && fileInput.files.length > 0) {
+    selectFile(fileInput.files[0]);
   }
+});
 
-  function clearFile() {
-    selectedFile = null;
-    fileInput.value = '';
-    fileSelected.classList.remove('visible');
-    runBtn.disabled = true;
+// Drag and drop
+uploadArea.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  uploadArea.classList.add('drag-over');
+});
+uploadArea.addEventListener('dragleave', function() {
+  uploadArea.classList.remove('drag-over');
+});
+uploadArea.addEventListener('drop', function(e) {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  if (e.dataTransfer.files.length > 0) {
+    selectFile(e.dataTransfer.files[0]);
   }
+});
 
-  // --- Run pipeline (async with job polling) ---
-  runBtn.addEventListener('click', async (e) => {
-    e.stopPropagation(); // prevent click bubbling into dropZone
-    if (!selectedFile) return;
+function selectFile(file) {
+  selectedFile = file;
+  filePillName.textContent = file.name;
+  filePill.classList.add('show');
+  runBtn.disabled = false;
+  hideError();
+  results.classList.remove('show');
+  logSection.classList.remove('show');
+}
 
-    hideError();
-    results.classList.remove('visible');
-    logSection.classList.add('visible');
-    logBox.innerHTML = '';
-    runBtn.disabled = true;
-    runBtn.innerHTML = '<span class="spinner"></span> Uploading...';
+filePillRemove.addEventListener('click', function(e) {
+  e.stopPropagation();
+  selectedFile = null;
+  fileInput.value = '';
+  filePill.classList.remove('show');
+  runBtn.disabled = true;
+});
 
-    addLog('Uploading file...', 'info');
-    addLog(`File: ${selectedFile.name}`, 'info');
+// ---------------------------------------------------------------
+// Run button — completely independent click handler
+// ---------------------------------------------------------------
+runBtn.addEventListener('click', function() {
+  if (!selectedFile) {
+    showError('Please select a file first.');
+    return;
+  }
+  startPipeline();
+});
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+function startPipeline() {
+  hideError();
+  results.classList.remove('show');
+  logSection.classList.add('show');
+  logBox.innerHTML = '';
+  runBtn.disabled = true;
+  runBtn.innerHTML = '<span class="spinner"></span> Uploading...';
 
-    let jobId = null;
+  addLog('Uploading file: ' + selectedFile.name, 'info');
 
-    try {
-      const response = await fetch('/upload', { method: 'POST', body: formData });
+  var formData = new FormData();
+  formData.append('file', selectedFile);
 
-      // Handle session expiry
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        showError('Session expired. Please refresh the page and sign in again.');
-        runBtn.disabled = false;
-        runBtn.innerHTML = 'Run Pipeline';
-        return;
-      }
-
-      const data = await response.json();
-
+  fetch('/upload', { method: 'POST', body: formData })
+    .then(function(res) {
+      return res.json();
+    })
+    .then(function(data) {
       if (!data.success) {
         showError(data.error || 'Upload failed.');
-        runBtn.disabled = false;
-        runBtn.innerHTML = 'Run Pipeline';
+        resetBtn();
         return;
       }
 
-      // Check for file-level errors (e.g. unsupported type)
-      const jobs = data.jobs || [];
-      const errored = jobs.filter(j => j.error);
+      var jobs = data.jobs || [];
+      var errored = jobs.filter(function(j) { return j.error; });
       if (errored.length > 0) {
         showError(errored[0].error);
-        runBtn.disabled = false;
-        runBtn.innerHTML = 'Run Pipeline';
+        resetBtn();
         return;
       }
 
-      jobId = jobs[0]?.job_id;
+      var jobId = jobs[0] && jobs[0].job_id;
       if (!jobId) {
-        showError('No job ID returned from server.');
-        runBtn.disabled = false;
-        runBtn.innerHTML = 'Run Pipeline';
+        showError('No job ID returned. Please try again.');
+        resetBtn();
         return;
       }
 
-      addLog('File uploaded — pipeline starting...', 'info');
+      addLog('File uploaded — pipeline running...', 'info');
       runBtn.innerHTML = '<span class="spinner"></span> Pipeline Running...';
+      pollStatus(jobId, 0);
+    })
+    .catch(function(err) {
+      showError('Network error: ' + err.message);
+      resetBtn();
+    });
+}
 
-      // Poll /status/<job_id> every 3 seconds
-      await pollJobStatus(jobId);
+// ---------------------------------------------------------------
+// Polling
+// ---------------------------------------------------------------
+var stageMessages = [
+  [5,  'Janitor agent — cleaning data...'],
+  [30, 'Researcher agent — analyzing patterns...'],
+  [70, 'Writer agent — generating report...'],
+];
 
-    } catch (err) {
-      addLog(`Network error: ${err.message}`, 'error');
-      showError(`Could not connect to the server.\n${err.message}`);
-      runBtn.disabled = false;
-      runBtn.innerHTML = 'Run Pipeline';
-    }
+function pollStatus(jobId, elapsed) {
+  // Show stage hints based on elapsed seconds
+  stageMessages.forEach(function(s) {
+    if (elapsed === s[0]) addLog(s[1], '');
   });
 
-  async function pollJobStatus(jobId) {
-    const stages = [
-      { delay: 5000,  msg: 'Janitor agent — cleaning data...' },
-      { delay: 30000, msg: 'Researcher agent — analyzing patterns...' },
-      { delay: 60000, msg: 'Writer agent — generating report...' },
-    ];
-    let stageIdx = 0;
-    let elapsed = 0;
-    const POLL_INTERVAL = 3000;
+  fetch('/status/' + jobId)
+    .then(function(res) { return res.json(); })
+    .then(function(job) {
+      if (job.status === 'done') {
+        addLog('✓ Pipeline complete!', 'success');
+        rawJson   = job.result.clean_json;
+        rawReport = job.result.report || '';
+        jsonOutput.textContent   = JSON.stringify(rawJson, null, 2);
+        reportOutput.innerHTML   = typeof marked !== 'undefined'
+          ? marked.parse(rawReport)
+          : rawReport.replace(/\n/g, '<br>');
+        results.classList.add('show');
+        resetBtn();
 
-    return new Promise((resolve) => {
-      const interval = setInterval(async () => {
-        elapsed += POLL_INTERVAL;
+      } else if (job.status === 'error') {
+        addLog('Error: ' + job.error, 'error');
+        showError(job.error);
+        resetBtn();
 
-        // Show stage hints based on elapsed time
-        while (stageIdx < stages.length && elapsed >= stages[stageIdx].delay) {
-          addLog(stages[stageIdx].msg, '');
-          stageIdx++;
-        }
+      } else if (job.status === 'not_found') {
+        showError('Job not found — the server may have restarted. Please try again.');
+        resetBtn();
 
-        try {
-          const res = await fetch(`/status/${jobId}`);
-          const job = await res.json();
-
-          if (job.status === 'done') {
-            clearInterval(interval);
-            addLog('✓ Janitor complete', 'success');
-            addLog('✓ Researcher complete', 'success');
-            addLog('✓ Writer complete', 'success');
-            addLog('Pipeline finished successfully!', 'success');
-
-            rawJsonData = job.result.clean_json;
-            rawReportData = job.result.report || '';
-
-            jsonOutput.textContent = JSON.stringify(job.result.clean_json, null, 2);
-            reportOutput.innerHTML = markdownToHtml(job.result.report || 'No report generated.');
-            results.classList.add('visible');
-
-            runBtn.disabled = false;
-            runBtn.innerHTML = 'Run Pipeline';
-            resolve();
-
-          } else if (job.status === 'error') {
-            clearInterval(interval);
-            addLog(`Error: ${job.error}`, 'error');
-            showError(job.error);
-            runBtn.disabled = false;
-            runBtn.innerHTML = 'Run Pipeline';
-            resolve();
-
-          } else if (job.status === 'not_found') {
-            clearInterval(interval);
-            showError('Job not found. The server may have restarted. Please try again.');
-            runBtn.disabled = false;
-            runBtn.innerHTML = 'Run Pipeline';
-            resolve();
-          }
-          // else: still running — keep polling
-
-        } catch (err) {
-          clearInterval(interval);
-          showError(`Lost connection to server: ${err.message}`);
-          runBtn.disabled = false;
-          runBtn.innerHTML = 'Run Pipeline';
-          resolve();
-        }
-      }, POLL_INTERVAL);
+      } else {
+        // Still running — poll again in 3s
+        setTimeout(function() { pollStatus(jobId, elapsed + 3); }, 3000);
+      }
+    })
+    .catch(function(err) {
+      showError('Lost connection to server: ' + err.message);
+      resetBtn();
     });
-  }
+}
 
-    // FIX: marked.js for proper markdown rendering
-  function markdownToHtml(md) {
-    if (typeof marked !== 'undefined') {
-      return marked.parse(md);
-    }
-    // Fallback if marked not loaded
-    return md.replace(/\n/g, '<br>');
-  }
+// ---------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------
+function addLog(text, type) {
+  var line = document.createElement('div');
+  line.className = 'log-line' + (type ? ' ' + type : '');
+  line.textContent = '> ' + text;
+  logBox.appendChild(line);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function showError(msg) {
+  errorBox.textContent = '❌ ' + msg;
+  errorBox.classList.add('show');
+}
+
+function hideError() {
+  errorBox.classList.remove('show');
+  errorBox.textContent = '';
+}
+
+function resetBtn() {
+  runBtn.disabled = false;
+  runBtn.textContent = 'Run Pipeline';
+}
+
+function downloadFile(content, filename, mime) {
+  var blob = new Blob([content], { type: mime });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+copyJsonBtn.addEventListener('click', function() {
+  if (!rawJson) return;
+  navigator.clipboard.writeText(JSON.stringify(rawJson, null, 2)).then(function() {
+    copyJsonBtn.textContent = 'Copied!';
+    setTimeout(function() { copyJsonBtn.textContent = 'Copy'; }, 1500);
+  });
+});
+
+copyReportBtn.addEventListener('click', function() {
+  if (!rawReport) return;
+  navigator.clipboard.writeText(rawReport).then(function() {
+    copyReportBtn.textContent = 'Copied!';
+    setTimeout(function() { copyReportBtn.textContent = 'Copy'; }, 1500);
+  });
+});
+
+dlJsonBtn.addEventListener('click', function() {
+  if (rawJson) downloadFile(JSON.stringify(rawJson, null, 2), 'clean_output.json', 'application/json');
+});
+
+dlReportBtn.addEventListener('click', function() {
+  if (rawReport) downloadFile(rawReport, 'business_report.md', 'text/markdown');
+});
 </script>
 </body>
 </html>
